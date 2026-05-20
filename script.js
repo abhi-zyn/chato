@@ -6,6 +6,8 @@ const sChats=document.getElementById('screenChats');
 const sConv=document.getElementById('screenConv');
 const sProfile=document.getElementById('screenProfile');
 const sSettings=document.getElementById('screenSettings');
+const sNotifications=document.getElementById('screenNotifications');
+const sCalls=document.getElementById('screenCalls');
 const msgBox=document.getElementById('messagesBox');
 const convAv=document.getElementById('convAvatar');
 const convNm=document.getElementById('convName');
@@ -22,8 +24,8 @@ function setNavActive(view){
 }
 
 function showScreen(n, navView){
-  [sChats,sConv,sProfile,sSettings].forEach(s=>s.classList.remove('active'));
-  const map={chats:sChats,conv:sConv,profile:sProfile,settings:sSettings};
+  [sChats,sConv,sProfile,sSettings,sNotifications,sCalls].forEach(s=>s.classList.remove('active'));
+  const map={chats:sChats,conv:sConv,profile:sProfile,settings:sSettings,notifications:sNotifications,calls:sCalls};
   if(map[n]) map[n].classList.add('active');
   // Sync nav — conv and settings don't have nav tab so inherit caller's
   if(navView) setNavActive(navView);
@@ -112,9 +114,11 @@ document.querySelectorAll('.nav-btn').forEach(b=>{
   b.addEventListener('click',()=>{
     const v=b.dataset.view;
     setNavActive(v);
-    if(v==='chats'||v==='home') showScreen('chats','chats');
+    if(v==='chats') showScreen('chats','chats');
     else if(v==='profile') showScreen('profile','profile');
-    // 'add' — no screen yet, stays on current
+    else if(v==='notifications') showScreen('notifications','notifications');
+    else if(v==='calls') showScreen('calls','calls');
+    // 'add' handled separately
   });
 });
 

@@ -244,3 +244,21 @@ html,body { height:100%; width:100%; overflow:hidden; overscroll-behavior:none; 
 .stranger-sub{font-size:14px;color:#8e8e93;text-align:center}
 .stranger-cancel{padding:14px 32px;border-radius:20px;border:1px solid rgba(0,0,0,0.1);background:rgba(255,255,255,0.15);backdrop-filter:blur(16px);font-family:inherit;font-size:15px;font-weight:600;color:#1a1a1a;cursor:pointer;transition:all 0.2s ease}
 .stranger-cancel:active{transform:scale(0.96)}
+
+/* ===== NOTIFICATIONS & CALLS ===== */
+.notif-list{display:flex;flex-direction:column;gap:8px;padding:0 24px 20px}
+.notif-item{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:20px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);backdrop-filter:blur(28px) saturate(140%);-webkit-backdrop-filter:blur(28px) saturate(140%);position:relative;overflow:hidden;transition:all 0.2s ease}
+.notif-item::before{content:'';position:absolute;inset:0;border-radius:20px;background:linear-gradient(135deg,rgba(255,255,255,0.3) 0%,rgba(255,255,255,0.04) 100%);pointer-events:none}
+.notif-item.unread{background:rgba(255,255,255,0.12);border-color:rgba(255,255,255,0.3)}
+.notif-item:active{transform:scale(0.97)}
+.notif-info{flex:1;min-width:0}
+.notif-text{font-size:14px;line-height:1.4;color:#1a1a1a;position:relative;z-index:1}
+.notif-time{font-size:12px;color:#8e8e93;margin-top:3px;position:relative;z-index:1}
+.notif-dot{width:10px;height:10px;border-radius:50%;background:#1a1a1a;flex-shrink:0;position:relative;z-index:1}
+.call-meta{font-size:12px;font-weight:600;margin-top:3px}
+.call-meta.incoming{color:#4cd964}
+.call-meta.missed{color:#ff3b30}
+.call-meta.outgoing{color:#8e8e93}
+.call-back-btn{width:38px;height:38px;border-radius:12px;border:1px solid rgba(255,255,255,0.22);background:rgba(255,255,255,0.1);backdrop-filter:blur(16px);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;position:relative;z-index:1;transition:all 0.2s ease}
+.call-back-btn:active{transform:scale(0.9)}
+.call-back-btn svg{width:17px;height:17px;stroke:#1a1a1a;stroke-width:2;fill:none}
