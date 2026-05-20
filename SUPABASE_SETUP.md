@@ -18,10 +18,10 @@
    - Set "Confirm email" to **ON** (recommended) or OFF for testing
    - Under "Email Templates → Reset Password", the default template is fine
 2. Go to **Authentication → URL Configuration**
-   - **Site URL**: `https://abhi-zyn.github.io/chato/`
+   - **Site URL**: `https://abhi-zyn.github.io/popchats/`
    - **Redirect URLs** (add both):
-     - `https://abhi-zyn.github.io/chato/`
-     - `https://abhi-zyn.github.io/chato/reset.html`
+     - `https://abhi-zyn.github.io/popchats/`
+     - `https://abhi-zyn.github.io/popchats/reset.html`
 
 ### Google OAuth (required for "Continue with Google")
 
@@ -59,7 +59,7 @@ script.js
 
 ## 5. Test
 
-1. Open `https://abhi-zyn.github.io/chato/`
+1. Open `https://abhi-zyn.github.io/popchats/`
 2. Sign up with an email + username
 3. Confirm email (if enabled)
 4. Sign in → you should see the empty chat list
