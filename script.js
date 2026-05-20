@@ -8,6 +8,7 @@ const sProfile=document.getElementById('screenProfile');
 const sSettings=document.getElementById('screenSettings');
 const sNotifications=document.getElementById('screenNotifications');
 const sCalls=document.getElementById('screenCalls');
+const sLogin=document.getElementById('screenLogin');
 const msgBox=document.getElementById('messagesBox');
 const convAv=document.getElementById('convAvatar');
 const convNm=document.getElementById('convName');
@@ -24,8 +25,8 @@ function setNavActive(view){
 }
 
 function showScreen(n, navView){
-  [sChats,sConv,sProfile,sSettings,sNotifications,sCalls].forEach(s=>s.classList.remove('active'));
-  const map={chats:sChats,conv:sConv,profile:sProfile,settings:sSettings,notifications:sNotifications,calls:sCalls};
+  [sLogin,sChats,sConv,sProfile,sSettings,sNotifications,sCalls].forEach(s=>s.classList.remove('active'));
+  const map={login:sLogin,chats:sChats,conv:sConv,profile:sProfile,settings:sSettings,notifications:sNotifications,calls:sCalls};
   if(map[n]) map[n].classList.add('active');
   // Sync nav — conv and settings don't have nav tab so inherit caller's
   if(navView) setNavActive(navView);
@@ -294,3 +295,64 @@ function animateOnlineCount(){
   }, 3000);
 }
 animateOnlineCount();
+
+// ===== LOGIN SCREEN =====
+let loginMode = 'login';
+
+function setTab(mode){
+  loginMode = mode;
+  const loginTab = document.getElementById('loginTab');
+  const signupTab = document.getElementById('signupTab');
+  const usernameWrap = document.getElementById('usernameWrap');
+  const forgotBtn = document.getElementById('forgotBtn');
+  const disclaimer = document.getElementById('loginDisclaimer');
+  const consumeText = document.getElementById('consumeText');
+  const signupLink = document.querySelector('.signup-link');
+
+  if(mode === 'signup'){
+    loginTab.classList.remove('active');
+    signupTab.classList.add('active');
+    usernameWrap.style.display = 'flex';
+    forgotBtn.style.display = 'none';
+    signupLink.textContent = 'Log in';
+    signupLink.setAttribute('onclick',"setTab('login')");
+    disclaimer.textContent = 'By signing up you agree to our terms and privacy policy.';
+    consumeText.textContent = 'Join the conversation!';
+  } else {
+    loginTab.classList.add('active');
+    signupTab.classList.remove('active');
+    usernameWrap.style.display = 'none';
+    forgotBtn.style.display = '';
+    signupLink.textContent = 'Sign up';
+    signupLink.setAttribute('onclick',"setTab('signup')");
+    disclaimer.textContent = 'Connect with people around you. By continuing you agree to our terms and privacy policy.';
+    consumeText.textContent = 'Please chat responsibly!';
+  }
+}
+
+document.getElementById('loginGoBtn').addEventListener('click', function(){
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+  if(!email || !password){
+    const card = document.getElementById('loginCard');
+    card.style.animation = 'none';
+    card.offsetHeight;
+    card.style.animation = 'shake 0.4s ease';
+    return;
+  }
+  if(loginMode === 'signup'){
+    const username = document.getElementById('loginUsername').value;
+    if(!username){
+      const card = document.getElementById('loginCard');
+      card.style.animation = 'none';
+      card.offsetHeight;
+      card.style.animation = 'shake 0.4s ease';
+      return;
+    }
+  }
+  showScreen('chats','chats');
+  document.querySelector('.bottom-nav').style.display = 'flex';
+});
+
+// Hide bottom nav on login
+document.querySelector('.bottom-nav').style.display = 'none';
