@@ -338,17 +338,40 @@ function shakeLogin() {
 }
 
 async function handleAuthSubmit() {
-  const email    = document.getElementById('loginEmail').value.trim();
+  const email    = document.getElementById('loginEmail').value.trim().toLowerCase();
   const password = document.getElementById('loginPassword').value;
   if (!email || !password) { shakeLogin(); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    toast('Enter a valid email address.');
+    shakeLogin();
+    return;
+  }
   const goBtn = document.getElementById('loginGoBtn');
   goBtn.disabled = true;
   try {
+    // Pre-check: does this email exist?
+    const exists = await PopChatsDB.emailExists(email);
+
     if (loginMode === 'signup') {
+      if (exists === true) {
+        toast('This email is already registered. Try logging in instead.');
+        shakeLogin();
+        setTab('login');
+        document.getElementById('loginPassword').value = '';
+        document.getElementById('loginPassword').focus();
+        goBtn.disabled = false;
+        return;
+      }
       const username = document.getElementById('loginUsername').value.trim();
       if (!username) { shakeLogin(); goBtn.disabled = false; return; }
       if (!/^[a-zA-Z0-9_]{3,24}$/.test(username)) {
         toast('Username: 3–24 chars, letters/numbers/underscore.');
+        shakeLogin();
+        goBtn.disabled = false;
+        return;
+      }
+      if (password.length < 6) {
+        toast('Password must be at least 6 characters.');
         shakeLogin();
         goBtn.disabled = false;
         return;
@@ -362,12 +385,40 @@ async function handleAuthSubmit() {
       }
       await bootAuthed(res.data.user);
     } else {
+      // Login mode
+      if (exists === false) {
+        toast('No account found with this email. Sign up first.');
+        shakeLogin();
+        setTab('signup');
+        document.getElementById('loginPassword').value = '';
+        goBtn.disabled = false;
+        return;
+      }
       const res = await PopChatsAuth.signIn(email, password);
-      if (res.error) throw res.error;
+      if (res.error) {
+        const msg = (res.error.message || '').toLowerCase();
+        if (msg.includes('invalid login') || msg.includes('credentials')) {
+          throw new Error('Wrong password. Check and try again.');
+        }
+        if (msg.includes('email not confirmed')) {
+          throw new Error('Please verify your email first. Check your inbox.');
+        }
+        throw res.error;
+      }
       if (res.data && res.data.user) await bootAuthed(res.data.user);
     }
   } catch (e) {
-    toast(e.message || 'Authentication failed');
+    const m = (e.message || '').toLowerCase();
+    let friendly = e.message || 'Authentication failed';
+    if (m.includes('user already registered') || m.includes('already exists')) {
+      friendly = 'This email is already registered. Try logging in.';
+      setTab('login');
+    } else if (m.includes('rate limit')) {
+      friendly = 'Too many attempts. Wait a minute and try again.';
+    } else if (m.includes('weak password') || m.includes('password should be')) {
+      friendly = 'Password too weak. Use at least 6 characters.';
+    }
+    toast(friendly);
     shakeLogin();
   } finally {
     goBtn.disabled = false;

@@ -83,6 +83,12 @@ window.PopChatsDB = (function () {
     return false;
   }
 
+  async function emailExists(email) {
+    const { data, error } = await client().rpc('email_exists', { p_email: email });
+    if (error) { console.error('[emailExists]', error); return null; }
+    return !!data;
+  }
+
   // ---------- chats ----------
   async function listMyChats() {
     const id = await uid(); if (!id) return [];
@@ -214,7 +220,7 @@ window.PopChatsDB = (function () {
   return {
     getMyProfile, upsertMyProfile, updateMyProfile, getProfile,
     searchProfiles, markOnline, countOnline,
-    uploadAvatar, isUsernameAvailable,
+    uploadAvatar, isUsernameAvailable, emailExists,
     listMyChats, getChatMembers,
     getOrCreateDM, startStrangerChat, pickRandomStranger,
     listMessages, sendMessage, subscribeToChat, unsubscribe,
