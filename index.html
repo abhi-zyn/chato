@@ -142,6 +142,30 @@
 
 </div>
 
+
+<!-- NEW CHAT MODAL -->
+<div class="modal-overlay" id="newChatModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2>New Chat</h2>
+      <button class="modal-close" id="modalClose">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-search-wrap">
+      <div class="modal-search-bar">
+        <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <input type="text" id="userIdInput" placeholder="Enter user ID or @username" autocomplete="off"/>
+        <button class="modal-search-btn" id="searchUserBtn">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="modal-result" id="modalResult"></div>
+  </div>
+</div>
+
 <nav class="bottom-nav">
   <button class="nav-btn" data-view="home"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>
   <button class="nav-btn active" data-view="chats"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>

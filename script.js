@@ -147,3 +147,73 @@ document.addEventListener('mousemove', e=>{
     o.style.transform=`translate(${x*f}px,${y*f}px)`;
   });
 });
+
+// ===== NEW CHAT MODAL =====
+const modal = document.getElementById('newChatModal');
+const userIdInput = document.getElementById('userIdInput');
+const modalResult = document.getElementById('modalResult');
+
+// Mock user directory for search
+const userDirectory = {
+  'single_dad':   {id:'1', name:'Single Dad',        handle:'@single_dad',   avatar:'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face'},
+  'seongsu':      {id:'2', name:'Seong-Su',           handle:'@seongsu',      avatar:'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face'},
+  'nathaniel':    {id:'3', name:'Nathaniel Hanul',    handle:'@nathaniel',    avatar:'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face'},
+  'godkingdom':   {id:'4', name:'God Kingdom',        handle:'@godkingdom',   avatar:'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop&crop=face'},
+  'celebrity':    {id:'5', name:'celebrity husband',  handle:'@celebrity',    avatar:'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=100&h=100&fit=crop&crop=face'},
+  'miarose':      {id:'6', name:'Mia Rose',           handle:'@miarose',      avatar:'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face'},
+};
+
+function openModal(){
+  modal.classList.add('open');
+  userIdInput.value='';
+  modalResult.innerHTML='';
+  setTimeout(()=>userIdInput.focus(), 400);
+}
+
+function closeModal(){
+  modal.classList.remove('open');
+  setNavActive('chats');
+}
+
+function searchUser(){
+  const q = userIdInput.value.trim().toLowerCase().replace('@','');
+  if(!q){ modalResult.innerHTML='<p class="result-msg">Type a username to search.</p>'; return; }
+
+  const match = Object.entries(userDirectory).find(([key, u])=>
+    key.includes(q) || u.name.toLowerCase().includes(q) || u.handle.replace('@','').includes(q)
+  );
+
+  if(match){
+    const u = match[1];
+    modalResult.innerHTML = `
+      <div class="result-card" id="resultCard">
+        <div class="result-avatar"><img src="${u.avatar}" alt="${u.name}"/></div>
+        <div class="result-info">
+          <div class="result-name">${u.name}</div>
+          <div class="result-handle">${u.handle}</div>
+        </div>
+        <button class="result-start-btn" data-uid="${u.id}">Chat</button>
+      </div>`;
+    document.querySelector('.result-start-btn').addEventListener('click', ()=>{
+      closeModal();
+      openChat(u.id);
+    });
+  } else {
+    modalResult.innerHTML='<p class="result-msg">No user found. Try another ID.</p>';
+  }
+}
+
+document.getElementById('modalClose').addEventListener('click', closeModal);
+document.getElementById('searchUserBtn').addEventListener('click', searchUser);
+document.getElementById('userIdInput').addEventListener('keydown', e=>{ if(e.key==='Enter') searchUser(); });
+modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
+
+// Wire + nav button to open modal
+document.querySelectorAll('.nav-btn').forEach(b=>{
+  if(b.dataset.view==='add'){
+    b.addEventListener('click', e=>{
+      e.stopPropagation();
+      openModal();
+    }, true);
+  }
+});
