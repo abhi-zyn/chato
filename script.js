@@ -297,7 +297,7 @@ function setTab(mode) {
     loginTab.classList.remove('active');
     signupTab.classList.add('active');
     usernameWrap.style.display = 'flex';
-    forgotBtn.style.display = 'none';
+    if (forgotBtn) forgotBtn.style.display = 'none';
     signupLink.textContent = 'Log in';
     signupLink.setAttribute('onclick', "setTab('login')");
     disclaimer.textContent = 'By signing up you agree to our terms and privacy policy.';
@@ -306,7 +306,7 @@ function setTab(mode) {
     loginTab.classList.add('active');
     signupTab.classList.remove('active');
     usernameWrap.style.display = 'none';
-    forgotBtn.style.display = '';
+    if (forgotBtn) forgotBtn.style.display = '';
     signupLink.textContent = 'Sign up';
     signupLink.setAttribute('onclick', "setTab('signup')");
     disclaimer.textContent = 'Connect with people around you. By continuing you agree to our terms and privacy policy.';
@@ -314,6 +314,19 @@ function setTab(mode) {
   }
 }
 window.setTab = setTab;
+
+// ---------- Eye toggle (password visibility) ----------
+function initEyeToggle() {
+  const toggle = document.getElementById('eyeToggle');
+  const passInput = document.getElementById('loginPassword');
+  if (!toggle || !passInput) return;
+  toggle.addEventListener('click', () => {
+    const isHidden = passInput.type === 'password';
+    passInput.type = isHidden ? 'text' : 'password';
+    toggle.querySelector('.eye-open').style.display = isHidden ? 'none' : '';
+    toggle.querySelector('.eye-closed').style.display = isHidden ? '' : 'none';
+  });
+}
 
 function shakeLogin() {
   const card = document.getElementById('loginCard');
@@ -333,26 +346,24 @@ async function handleAuthSubmit() {
   try {
     if (loginMode === 'signup') {
       const username = document.getElementById('loginUsername').value.trim();
-      if (!username) { shakeLogin(); return; }
+      if (!username) { shakeLogin(); goBtn.disabled = false; return; }
       if (!/^[a-zA-Z0-9_]{3,24}$/.test(username)) {
         toast('Username: 3–24 chars, letters/numbers/underscore.');
         shakeLogin();
+        goBtn.disabled = false;
         return;
       }
       const res = await ChatoAuth.signUp(email, password, username);
       if (res.error) throw res.error;
       if (!res.data.session) {
-        // Email confirmation required — show verify dialog
         showVerifyEmailDialog(email);
         setTab('login');
         return;
       }
-      // Session granted immediately (confirmation off) — boot
       await bootAuthed(res.data.user);
     } else {
       const res = await ChatoAuth.signIn(email, password);
       if (res.error) throw res.error;
-      // Don't rely solely on auth listener — boot now
       if (res.data && res.data.user) await bootAuthed(res.data.user);
     }
   } catch (e) {
@@ -487,7 +498,11 @@ async function loadCallsScreen() {
 // ---------- Boot / auth gate ----------
 let bootingAuthed = false;
 async function bootAuthed(user) {
-  if (bootingAuthed) return;
+  if (bootingAuthed) {
+    // Already booting — just ensure we show chats screen
+    showScreen('chats', 'chats');
+    return;
+  }
   bootingAuthed = true;
   try {
     me = await ChatoDB.getMyProfile();
@@ -502,6 +517,9 @@ async function bootAuthed(user) {
     showScreen('chats', 'chats');
     await loadChatList();
     refreshProfileScreen();
+  } catch (e) {
+    console.error('bootAuthed error', e);
+    showScreen('chats', 'chats');
   } finally {
     bootingAuthed = false;
   }
@@ -567,6 +585,7 @@ function bootUnauthed() {
   document.getElementById('loginGoBtn').addEventListener('click', handleAuthSubmit);
   document.getElementById('loginPassword').addEventListener('keydown',
     e => { if (e.key === 'Enter') handleAuthSubmit(); });
+  initEyeToggle();
 
   // Google OAuth
   const googleBtn = document.getElementById('googleBtn');
