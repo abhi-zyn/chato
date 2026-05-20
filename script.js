@@ -614,8 +614,33 @@ function bootUnauthed() {
   // Sign-out
   const signOutBtn = document.getElementById('signOutBtn');
   if (signOutBtn) signOutBtn.addEventListener('click', async () => {
-    try { await ChatoDB.markOnline(false); } catch (_) {}
-    await ChatoAuth.signOut();
+    if (signOutBtn.dataset.busy === '1') return;
+    signOutBtn.dataset.busy = '1';
+    try {
+      try { await ChatoDB.markOnline(false); } catch (_) {}
+      try { if (messageSub) { ChatoDB.unsubscribe(messageSub); messageSub = null; } } catch (_) {}
+      const { error } = await ChatoAuth.signOut();
+      if (error) {
+        console.error('signOut error', error);
+        toast(error.message || 'Sign out failed');
+      }
+      // Force unauth state immediately — don't depend on auth listener
+      me = null;
+      try {
+        Object.keys(localStorage)
+          .filter(k => k.startsWith('sb-') || k.startsWith('supabase'))
+          .forEach(k => localStorage.removeItem(k));
+      } catch (_) {}
+      showScreen('login');
+      // Reset login form to a clean state
+      const emailIn = document.getElementById('loginEmail');
+      const passIn  = document.getElementById('loginPassword');
+      if (emailIn) emailIn.value = '';
+      if (passIn)  passIn.value = '';
+      setTab('login');
+    } finally {
+      signOutBtn.dataset.busy = '0';
+    }
   });
 
   // Auth state
