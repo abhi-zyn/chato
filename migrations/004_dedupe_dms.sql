@@ -44,22 +44,9 @@ begin
 end $$;
 
 -- 2. Add a partial unique index so two users can never have more than one
---    non-stranger DM going forward. We hash the (lesser, greater) pair.
-create or replace function public.dm_pair_key(_chat_id uuid)
-returns text
-language sql
-stable
-as $$
-  with users as (
-    select user_id from public.chat_members where chat_id = _chat_id
-  ),
-  cnt as (select count(*) as n from users),
-  ord as (select min(user_id) as a, max(user_id) as b from users)
-  select case
-    when (select n from cnt) = 2 then concat((select a from ord)::text, ':', (select b from ord)::text)
-    else null
-  end;
-$$;
+--    non-stranger DM going forward. (The advisory lock in get_or_create_dm
+--    below is the actual concurrency guard; this section is a no-op now.)
+-- (helper function removed — uuid has no built-in min/max aggregate)
 
 -- 3. Tighten the RPC: take a row-level lock on a per-pair advisory lock so
 --    two simultaneous calls can't both insert.
