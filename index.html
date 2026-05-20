@@ -168,7 +168,7 @@
         <div class="settings-section-title">Account</div>
         <div class="profile-card" style="padding:10px 20px">
           <div class="menu-list">
-            <div class="menu-item"><div class="menu-item-left"><div class="menu-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><span class="menu-label">Edit Profile</span></div><svg class="menu-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+            <div class="menu-item" id="editProfileMenuItem"><div class="menu-item-left"><div class="menu-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><span class="menu-label">Edit Profile</span></div><svg class="menu-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
             <div class="menu-item"><div class="menu-item-left"><div class="menu-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><span class="menu-label">Privacy</span></div><svg class="menu-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
             <div class="menu-item"><div class="menu-item-left"><div class="menu-icon"><svg viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg></div><span class="menu-label">About</span></div><svg class="menu-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
             <div class="menu-item" id="signOutBtn"><div class="menu-item-left"><div class="menu-icon" style="color:#c14040;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div><span class="menu-label" style="color:#c14040;">Sign out</span></div><svg class="menu-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
@@ -247,6 +247,65 @@
     <button class="login-go-btn" id="forgotSubmit" style="width:100%;border-radius:100px;height:42px;font-size:13px;font-weight:500;">Send reset link</button>
     <p id="forgotMsg" style="font-size:12px;color:#9a9488;text-align:center;margin-top:12px;min-height:16px;"></p>
     <button id="forgotClose" style="display:block;margin:8px auto 0;background:none;border:none;font-size:13px;color:#9a9488;cursor:pointer;font-family:'Geist',sans-serif;">Cancel</button>
+  </div>
+</div>
+
+<!-- ONBOARDING MODAL (first-time login) -->
+<div class="modal-overlay onboard-overlay" id="onboardModal" style="z-index:1300;align-items:center;">
+  <div class="onboard-sheet">
+    <div class="onboard-header">
+      <h2 class="onboard-title">Welcome to PopChats</h2>
+      <p class="onboard-sub">Let's set up your profile</p>
+    </div>
+
+    <div class="onboard-avatar-row">
+      <label class="onboard-avatar-picker" for="onboardAvatarFile">
+        <img id="onboardAvatarPreview" src="https://api.dicebear.com/7.x/initials/svg?seed=PopChats" alt=""/>
+        <div class="onboard-avatar-edit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </div>
+      </label>
+      <input type="file" id="onboardAvatarFile" accept="image/*" style="display:none"/>
+      <p class="onboard-avatar-hint">Tap to add photo</p>
+    </div>
+
+    <div class="onboard-fields">
+      <div class="onboard-field">
+        <label>Username <span class="onboard-req">*</span></label>
+        <div class="onboard-input-wrap">
+          <span class="onboard-prefix">@</span>
+          <input type="text" id="onboardUsername" placeholder="your_username" autocomplete="off"/>
+          <span class="onboard-status" id="onboardUsernameStatus"></span>
+        </div>
+      </div>
+
+      <div class="onboard-field">
+        <label>Full Name <span class="onboard-req">*</span></label>
+        <div class="onboard-input-wrap">
+          <input type="text" id="onboardFullName" placeholder="Your name" autocomplete="name"/>
+        </div>
+      </div>
+
+      <div class="onboard-field">
+        <label>Date of Birth <span class="onboard-private">private</span></label>
+        <div class="onboard-input-wrap">
+          <input type="date" id="onboardDob"/>
+        </div>
+      </div>
+
+      <div class="onboard-field">
+        <label>Gender</label>
+        <div class="onboard-gender-row">
+          <button type="button" class="gender-chip" data-gender="male">Male</button>
+          <button type="button" class="gender-chip" data-gender="female">Female</button>
+          <button type="button" class="gender-chip" data-gender="other">Other</button>
+          <button type="button" class="gender-chip" data-gender="prefer_not">Prefer not to say</button>
+        </div>
+      </div>
+    </div>
+
+    <p id="onboardMsg" class="onboard-msg"></p>
+    <button id="onboardSubmit" class="onboard-submit-btn">Complete profile</button>
   </div>
 </div>
 

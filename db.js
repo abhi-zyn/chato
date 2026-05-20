@@ -60,6 +60,29 @@ window.PopChatsDB = (function () {
     return count || 0;
   }
 
+  // ---------- avatar upload ----------
+  async function uploadAvatar(file) {
+    const id = await uid(); if (!id) throw new Error('Not signed in');
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const path = `${id}/avatar_${Date.now()}.${ext}`;
+    const { error: upErr } = await client().storage.from('avatars').upload(path, file, {
+      cacheControl: '3600',
+      upsert: true,
+      contentType: file.type || undefined
+    });
+    if (upErr) throw upErr;
+    const { data: pub } = client().storage.from('avatars').getPublicUrl(path);
+    return pub.publicUrl;
+  }
+
+  async function isUsernameAvailable(username, exceptId) {
+    const q = client().from('profiles').select('id').eq('username', username).limit(1);
+    const { data } = await q;
+    if (!data || !data.length) return true;
+    if (exceptId && data[0].id === exceptId) return true;
+    return false;
+  }
+
   // ---------- chats ----------
   async function listMyChats() {
     const id = await uid(); if (!id) return [];
@@ -191,6 +214,7 @@ window.PopChatsDB = (function () {
   return {
     getMyProfile, upsertMyProfile, updateMyProfile, getProfile,
     searchProfiles, markOnline, countOnline,
+    uploadAvatar, isUsernameAvailable,
     listMyChats, getChatMembers,
     getOrCreateDM, startStrangerChat, pickRandomStranger,
     listMessages, sendMessage, subscribeToChat, unsubscribe,

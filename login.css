@@ -132,3 +132,193 @@
 .login-go-btn { width: 42px; height: 42px; background: #111110; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: white; transition: all 0.25s; flex-shrink: 0; }
 .login-go-btn:hover { background: #2a2a28; transform: scale(1.08); box-shadow: 0 6px 20px rgba(0,0,0,0.2); }
 .login-go-btn svg { width: 18px; height: 18px; }
+
+
+/* ==========================================
+   Onboarding modal (first-time login)
+   ========================================== */
+.onboard-overlay { padding: 16px; }
+.onboard-sheet {
+  width: 100%;
+  max-width: 380px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: linear-gradient(180deg, #faf5ed 0%, #f5ede0 100%);
+  border-radius: 28px;
+  padding: 28px 24px 24px;
+  box-shadow: 0 24px 80px rgba(100, 80, 60, 0.25), 0 2px 0 rgba(255, 255, 255, 0.7) inset;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  font-family: 'Geist', sans-serif;
+  transform: translateY(20px) scale(0.98);
+  opacity: 0;
+  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.onboard-overlay.open .onboard-sheet { transform: none; opacity: 1; }
+
+.onboard-header { text-align: center; margin-bottom: 20px; }
+.onboard-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: 28px;
+  font-weight: 400;
+  color: #1a1a18;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+.onboard-sub { font-size: 13px; color: #9a9488; }
+
+.onboard-avatar-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 22px;
+}
+.onboard-avatar-picker {
+  position: relative;
+  width: 92px; height: 92px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: block;
+  overflow: hidden;
+  background: #ede8e0;
+  box-shadow: 0 8px 24px rgba(100, 80, 60, 0.18), 0 0 0 4px white;
+  transition: transform 0.2s;
+}
+.onboard-avatar-picker:hover { transform: scale(1.04); }
+.onboard-avatar-picker img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.onboard-avatar-edit {
+  position: absolute;
+  bottom: 0; right: 0;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: #f4713a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+}
+.onboard-avatar-edit svg { width: 14px; height: 14px; color: white; }
+.onboard-avatar-hint { font-size: 11px; color: #9a9488; margin-top: 8px; }
+
+.onboard-fields { display: flex; flex-direction: column; gap: 14px; margin-bottom: 16px; }
+.onboard-field { display: flex; flex-direction: column; gap: 6px; }
+.onboard-field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b665d;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px;
+}
+.onboard-req { color: #f4713a; font-size: 11px; }
+.onboard-private {
+  font-size: 9px;
+  background: rgba(244, 113, 58, 0.1);
+  color: #f4713a;
+  padding: 2px 7px;
+  border-radius: 100px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.onboard-input-wrap {
+  display: flex;
+  align-items: center;
+  background: white;
+  border-radius: 14px;
+  padding: 11px 14px;
+  border: 1.5px solid transparent;
+  transition: all 0.2s;
+  gap: 6px;
+}
+.onboard-input-wrap:focus-within {
+  border-color: #f4713a;
+  box-shadow: 0 0 0 4px rgba(244, 113, 58, 0.08);
+}
+.onboard-prefix { color: #9a9488; font-size: 14px; }
+.onboard-input-wrap input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  color: #1a1a18;
+  font-family: 'Geist', sans-serif;
+}
+.onboard-input-wrap input::placeholder { color: #c4bcae; }
+.onboard-status { font-size: 11px; min-width: 60px; text-align: right; }
+.onboard-status.ok { color: #2a7a2a; }
+.onboard-status.err { color: #c14040; }
+
+.onboard-gender-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.gender-chip {
+  flex: 1 1 calc(50% - 3px);
+  padding: 10px 12px;
+  background: white;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: 'Geist', sans-serif;
+  color: #6b665d;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.gender-chip:hover { background: #f9f4ee; }
+.gender-chip.active {
+  background: #1a1a18;
+  color: white;
+  border-color: #1a1a18;
+}
+
+.onboard-msg {
+  font-size: 12px;
+  color: #c14040;
+  text-align: center;
+  min-height: 16px;
+  margin-bottom: 12px;
+}
+
+.onboard-submit-btn {
+  width: 100%;
+  background: #1a1a18;
+  color: white;
+  border: none;
+  border-radius: 100px;
+  padding: 14px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: 'Geist', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+.onboard-submit-btn:hover:not(:disabled) {
+  background: #2a2a28;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+}
+.onboard-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+
+.search-section-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #9a9488;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 12px 24px 6px;
+}
+.chat-start-pill {
+  background: #1a1a18;
+  color: white;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 100px;
+}

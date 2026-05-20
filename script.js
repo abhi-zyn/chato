@@ -433,11 +433,253 @@ async function submitForgot() {
 function refreshProfileScreen() {
   if (!me) return;
   document.querySelectorAll('.profile-name').forEach(el =>
-    el.textContent = me.display_name || me.username);
+    el.textContent = me.full_name || me.display_name || me.username);
   document.querySelectorAll('.profile-handle').forEach(el =>
     el.textContent = '@' + me.username);
   document.querySelectorAll('.profile-avatar img').forEach(el =>
     el.src = avatarOf(me));
+}
+
+// ---------- Onboarding modal ----------
+let onboardingState = { gender: null, avatarFile: null, avatarUrl: null, usernameOk: false };
+
+function openOnboardingModal(authUser) {
+  const m = document.getElementById('onboardModal');
+  if (!m) return;
+  // Pre-fill from existing profile / auth user metadata
+  const meta = (authUser && authUser.user_metadata) || {};
+  const seed = me && me.username ? me.username : 'PopChats';
+  document.getElementById('onboardAvatarPreview').src =
+    (me && me.avatar_url) || meta.avatar_url ||
+    ('https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent(seed));
+
+  document.getElementById('onboardUsername').value = (me && me.username) || '';
+  document.getElementById('onboardFullName').value =
+    (me && me.full_name) || meta.full_name || meta.name || (me && me.display_name) || '';
+  document.getElementById('onboardDob').value = (me && me.dob) || '';
+
+  onboardingState = {
+    gender: (me && me.gender) || null,
+    avatarFile: null,
+    avatarUrl: (me && me.avatar_url) || meta.avatar_url || null,
+    usernameOk: true
+  };
+  document.querySelectorAll('.gender-chip').forEach(c =>
+    c.classList.toggle('active', c.dataset.gender === onboardingState.gender));
+  document.getElementById('onboardMsg').textContent = '';
+  document.getElementById('onboardUsernameStatus').textContent = '';
+
+  m.classList.add('open');
+}
+
+function closeOnboardingModal() {
+  const m = document.getElementById('onboardModal');
+  if (m) m.classList.remove('open');
+}
+
+function initOnboardingHandlers() {
+  // Avatar file picker
+  const fileInput = document.getElementById('onboardAvatarFile');
+  if (fileInput) {
+    fileInput.addEventListener('change', e => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) {
+        document.getElementById('onboardMsg').textContent = 'Image must be under 5 MB.';
+        return;
+      }
+      onboardingState.avatarFile = file;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        document.getElementById('onboardAvatarPreview').src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Gender chips
+  document.querySelectorAll('.gender-chip').forEach(c => {
+    c.addEventListener('click', () => {
+      onboardingState.gender = c.dataset.gender;
+      document.querySelectorAll('.gender-chip').forEach(x =>
+        x.classList.toggle('active', x === c));
+    });
+  });
+
+  // Username live availability check (debounced)
+  const userInput = document.getElementById('onboardUsername');
+  const userStatus = document.getElementById('onboardUsernameStatus');
+  let usernameTimer = null;
+  if (userInput) {
+    userInput.addEventListener('input', () => {
+      const v = userInput.value.trim();
+      userStatus.textContent = '';
+      userStatus.className = 'onboard-status';
+      onboardingState.usernameOk = false;
+      if (!v) return;
+      if (!/^[a-zA-Z0-9_]{3,24}$/.test(v)) {
+        userStatus.textContent = 'invalid';
+        userStatus.classList.add('err');
+        return;
+      }
+      clearTimeout(usernameTimer);
+      userStatus.textContent = 'checking…';
+      usernameTimer = setTimeout(async () => {
+        const ok = await PopChatsDB.isUsernameAvailable(v.toLowerCase(), me && me.id);
+        if (userInput.value.trim() !== v) return; // stale
+        onboardingState.usernameOk = ok;
+        userStatus.textContent = ok ? 'available' : 'taken';
+        userStatus.classList.add(ok ? 'ok' : 'err');
+      }, 350);
+    });
+  }
+
+  // Submit
+  const submitBtn = document.getElementById('onboardSubmit');
+  if (submitBtn) submitBtn.addEventListener('click', submitOnboarding);
+}
+
+async function submitOnboarding() {
+  const msgEl = document.getElementById('onboardMsg');
+  const submitBtn = document.getElementById('onboardSubmit');
+  msgEl.textContent = '';
+  msgEl.style.color = '#c14040';
+
+  const username = document.getElementById('onboardUsername').value.trim().toLowerCase();
+  const fullName = document.getElementById('onboardFullName').value.trim();
+  const dob      = document.getElementById('onboardDob').value || null;
+  const gender   = onboardingState.gender;
+
+  if (!username || !/^[a-zA-Z0-9_]{3,24}$/.test(username)) {
+    msgEl.textContent = 'Enter a valid username (3–24 chars, letters/numbers/_).';
+    return;
+  }
+  if (!fullName) {
+    msgEl.textContent = 'Enter your full name.';
+    return;
+  }
+  if (!onboardingState.usernameOk && username !== (me && me.username)) {
+    msgEl.textContent = 'Pick an available username.';
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Saving…';
+  try {
+    let avatarUrl = onboardingState.avatarUrl;
+    if (onboardingState.avatarFile) {
+      msgEl.style.color = '#9a9488';
+      msgEl.textContent = 'Uploading photo…';
+      avatarUrl = await PopChatsDB.uploadAvatar(onboardingState.avatarFile);
+    }
+    const patch = {
+      username,
+      full_name: fullName,
+      display_name: fullName,
+      dob,
+      gender,
+      onboarded: true
+    };
+    if (avatarUrl) patch.avatar_url = avatarUrl;
+
+    me = await PopChatsDB.updateMyProfile(patch);
+    closeOnboardingModal();
+    refreshProfileScreen();
+    toast('Profile saved!');
+  } catch (e) {
+    console.error(e);
+    msgEl.style.color = '#c14040';
+    msgEl.textContent = e.message || 'Could not save profile.';
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Complete profile';
+  }
+}
+
+// ---------- Chats-screen search (chats + users) ----------
+function initChatsSearch() {
+  const input = document.querySelector('#screenChats .search-bar input');
+  if (!input) return;
+  let searchTimer = null;
+  input.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    const q = input.value.trim();
+    searchTimer = setTimeout(() => runChatsSearch(q), 250);
+  });
+}
+
+async function runChatsSearch(q) {
+  if (!chatList) return;
+  if (!q) { await loadChatList(); return; }
+
+  // Filter local chats by other-user name
+  const allChats = await PopChatsDB.listMyChats();
+  const lq = q.toLowerCase().replace(/^@/, '');
+  const matchedChats = allChats.filter(c => {
+    const o = c.other;
+    if (!o) return false;
+    return (o.username || '').toLowerCase().includes(lq) ||
+           (o.display_name || '').toLowerCase().includes(lq) ||
+           (o.full_name || '').toLowerCase().includes(lq);
+  });
+
+  // Search all users (excluding myself & those already in chats)
+  const existingIds = new Set(allChats.map(c => c.other && c.other.id).filter(Boolean));
+  const found = await PopChatsDB.searchProfiles(lq);
+  const newUsers = found.filter(u => u.id !== (me && me.id) && !existingIds.has(u.id));
+
+  let html = '';
+  if (matchedChats.length) {
+    html += '<div class="search-section-label">Your chats</div>';
+    html += matchedChats.map(c => renderChatRow(c)).join('');
+  }
+  if (newUsers.length) {
+    html += '<div class="search-section-label">People</div>';
+    html += newUsers.slice(0, 10).map(u => `
+      <div class="chat-item" data-newuid="${u.id}">
+        <div class="chat-avatar"><img src="${avatarOf(u)}" alt=""/></div>
+        <div class="chat-info">
+          <div class="chat-name">${escapeHtml(u.full_name || u.display_name || u.username)}</div>
+          <div class="chat-last">@${escapeHtml(u.username)}</div>
+        </div>
+        <div class="chat-meta"><div class="chat-start-pill">Start</div></div>
+      </div>`).join('');
+  }
+  if (!html) {
+    chatList.innerHTML =
+      '<div style="padding:30px;text-align:center;color:#9a9488;font-size:13px;">' +
+      'No matches.</div>';
+    return;
+  }
+  chatList.innerHTML = html;
+
+  // Wire new-user rows
+  chatList.querySelectorAll('[data-newuid]').forEach(el => {
+    el.addEventListener('click', async () => {
+      const uid = el.dataset.newuid;
+      const profile = newUsers.find(u => u.id === uid);
+      try {
+        const chatId = await PopChatsDB.getOrCreateDM(uid);
+        await loadChatList();
+        openChat(chatId, profile);
+      } catch (e) {
+        toast('Could not start chat: ' + (e.message || 'error'));
+      }
+    });
+  });
+}
+
+function renderChatRow(c) {
+  const o = c.other;
+  return `
+    <div class="chat-item" data-chatid="${c.id}">
+      <div class="chat-avatar"><img src="${avatarOf(o)}" alt=""/></div>
+      <div class="chat-info">
+        <div class="chat-name">${escapeHtml((o && (o.full_name || o.display_name || o.username)) || 'Unknown')}</div>
+        <div class="chat-last">${escapeHtml(c.last_text || '')}</div>
+      </div>
+      <div class="chat-meta"><div class="chat-time">${c.last_time ? formatTime(c.last_time) : ''}</div></div>
+    </div>`;
 }
 
 // ---------- Notifications & Calls (history) ----------
@@ -499,7 +741,6 @@ async function loadCallsScreen() {
 let bootingAuthed = false;
 async function bootAuthed(user) {
   if (bootingAuthed) {
-    // Already booting — just ensure we show chats screen
     showScreen('chats', 'chats');
     return;
   }
@@ -507,7 +748,8 @@ async function bootAuthed(user) {
   try {
     me = await PopChatsDB.getMyProfile();
     if (!me) {
-      const fallbackUsername = ((user && user.email) || 'user_' + Date.now()).split('@')[0];
+      const fallbackUsername = ((user && user.email) || 'user_' + Date.now()).split('@')[0]
+        .replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 24);
       try {
         me = await PopChatsDB.upsertMyProfile({ username: fallbackUsername, display_name: fallbackUsername });
       } catch (e) { console.error('profile init failed', e); }
@@ -517,6 +759,8 @@ async function bootAuthed(user) {
     showScreen('chats', 'chats');
     await loadChatList();
     refreshProfileScreen();
+    // First-time login: prompt for full profile
+    if (me && !me.onboarded) openOnboardingModal(user);
   } catch (e) {
     console.error('bootAuthed error', e);
     showScreen('chats', 'chats');
@@ -587,6 +831,14 @@ function bootUnauthed() {
     e => { if (e.key === 'Enter') handleAuthSubmit(); });
   initEyeToggle();
 
+  // Onboarding modal
+  initOnboardingHandlers();
+  const editProfileItem = document.getElementById('editProfileMenuItem');
+  if (editProfileItem) editProfileItem.addEventListener('click', () => openOnboardingModal());
+
+  // Chats screen search
+  initChatsSearch();
+
   // Google OAuth
   const googleBtn = document.getElementById('googleBtn');
   if (googleBtn) googleBtn.addEventListener('click', handleGoogleSignIn);
@@ -653,6 +905,28 @@ function bootUnauthed() {
       // Reset flow lives on reset.html; ignore here.
     }
   });
+
+  // Handle OAuth callback (?code=...) — manual PKCE exchange in case auto-detect missed it
+  const urlObj = new URL(window.location.href);
+  const oauthCode = urlObj.searchParams.get('code');
+  if (oauthCode) {
+    try {
+      const { data, error } = await window.sb.auth.exchangeCodeForSession(window.location.href);
+      if (error) {
+        console.error('[OAuth] exchange failed:', error);
+        toast('Sign-in failed: ' + error.message);
+      } else if (data && data.session) {
+        // Clean URL (remove ?code & ?state)
+        urlObj.searchParams.delete('code');
+        urlObj.searchParams.delete('state');
+        window.history.replaceState({}, document.title, urlObj.pathname + urlObj.search + urlObj.hash);
+        await bootAuthed(data.session.user);
+        return; // skip the getSession check below; we just booted
+      }
+    } catch (e) {
+      console.error('[OAuth] exchange threw:', e);
+    }
+  }
 
   const session = await PopChatsAuth.getSession();
   if (session) await bootAuthed(session.user);
