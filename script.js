@@ -513,19 +513,26 @@ function openOnboardingModal(authUser) {
     gender: (me && me.gender) || null,
     avatarFile: null,
     avatarUrl: (me && me.avatar_url) || meta.avatar_url || null,
-    usernameOk: true
+    usernameOk: true,
+    isFirstTime: !(me && me.onboarded)
   };
   document.querySelectorAll('.gender-chip').forEach(c =>
     c.classList.toggle('active', c.dataset.gender === onboardingState.gender));
   document.getElementById('onboardMsg').textContent = '';
   document.getElementById('onboardUsernameStatus').textContent = '';
 
+  // Show/hide skip button based on whether onboarding is required
+  const closeBtn = document.getElementById('onboardCloseBtn');
+  if (closeBtn) closeBtn.style.display = onboardingState.isFirstTime ? 'none' : 'block';
+
+  document.body.classList.add('modal-open');
   m.classList.add('open');
 }
 
 function closeOnboardingModal() {
   const m = document.getElementById('onboardModal');
   if (m) m.classList.remove('open');
+  document.body.classList.remove('modal-open');
 }
 
 function initOnboardingHandlers() {
@@ -588,6 +595,16 @@ function initOnboardingHandlers() {
   // Submit
   const submitBtn = document.getElementById('onboardSubmit');
   if (submitBtn) submitBtn.addEventListener('click', submitOnboarding);
+
+  // Close button (only shown when editing existing profile)
+  const closeBtn = document.getElementById('onboardCloseBtn');
+  if (closeBtn) closeBtn.addEventListener('click', closeOnboardingModal);
+
+  // Tap outside to close (only when NOT first-time onboarding)
+  const modal = document.getElementById('onboardModal');
+  if (modal) modal.addEventListener('click', e => {
+    if (e.target === modal && !onboardingState.isFirstTime) closeOnboardingModal();
+  });
 }
 
 async function submitOnboarding() {

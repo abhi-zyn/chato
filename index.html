@@ -251,8 +251,11 @@
 </div>
 
 <!-- ONBOARDING MODAL (first-time login) -->
-<div class="modal-overlay onboard-overlay" id="onboardModal" style="z-index:1300;align-items:center;">
+<div class="modal-overlay onboard-overlay" id="onboardModal" style="z-index:9999;">
   <div class="onboard-sheet">
+    <button id="onboardCloseBtn" class="onboard-close" type="button" aria-label="Close" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
     <div class="onboard-header">
       <h2 class="onboard-title">Welcome to PopChats</h2>
       <p class="onboard-sub">Let's set up your profile</p>
