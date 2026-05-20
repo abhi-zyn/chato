@@ -56,12 +56,73 @@
 .login-input-wrap input { flex: 1; border: none; outline: none; background: transparent; font-size: 14px; font-family: 'Geist', sans-serif; color: #1a1a18; }
 .login-input-wrap input::placeholder { color: #9a9488; }
 
-.eye-toggle { background: none; border: none; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; }
-.eye-toggle svg { width: 18px; height: 18px; color: #9a9488; transition: color 0.2s; }
+.eye-toggle {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.eye-toggle:hover {
+  background: white;
+  transform: scale(1.08);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+.eye-toggle:active { transform: scale(0.95); }
+.eye-toggle svg { width: 15px; height: 15px; color: #6b665d; transition: color 0.2s; }
 .eye-toggle:hover svg { color: #1a1a18; }
 
-.forgot-pass-link { background: none; border: none; font-size: 12px; color: #f4713a; font-family: 'Geist', sans-serif; cursor: pointer; padding: 4px 0 0 18px; font-weight: 500; text-align: left; transition: opacity 0.2s; }
-.forgot-pass-link:hover { opacity: 0.7; }
+.forgot-pass-link {
+  align-self: flex-end;
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: #6b665d;
+  font-family: 'Geist', sans-serif;
+  cursor: pointer;
+  padding: 6px 14px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 100px;
+  margin-top: 4px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+.forgot-pass-link::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 100px;
+  background: linear-gradient(135deg, rgba(244, 113, 58, 0.08), rgba(244, 168, 118, 0.08));
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  z-index: -1;
+}
+.forgot-pass-link:hover {
+  color: #f4713a;
+  transform: translateX(-2px);
+}
+.forgot-pass-link:hover::before { opacity: 1; }
+.forgot-pass-link .key-icon {
+  width: 13px;
+  height: 13px;
+  opacity: 0.7;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.forgot-pass-link:hover .key-icon {
+  opacity: 1;
+  transform: rotate(-15deg);
+}
 
 .login-disclaimer { font-size: 10.5px; color: #9a9488; line-height: 1.5; margin: 14px 0 16px; }
 .login-disclaimer a { color: #9a9488; text-decoration: underline; }
