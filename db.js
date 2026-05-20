@@ -1,5 +1,5 @@
-// Chato — Data layer (profiles, chats, messages, realtime)
-window.ChatoDB = (function () {
+// PopChats — Data layer (profiles, chats, messages, realtime)
+window.PopChatsDB = (function () {
   function client() { return window.sb; }
 
   async function uid() {

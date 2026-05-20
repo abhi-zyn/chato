@@ -1,4 +1,4 @@
-# Chato — Supabase Setup Guide
+# PopChats — Supabase Setup Guide
 
 ## 1. Run the schema
 

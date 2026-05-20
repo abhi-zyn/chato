@@ -1,5 +1,5 @@
 -- =========================================================
--- Chato — Supabase schema
+-- PopChats — Supabase schema
 -- Run this entire file once in:  Supabase → SQL Editor → New query
 -- =========================================================
 

@@ -1,5 +1,5 @@
 // =====================================================================
-// Chato — main app script (Supabase-backed)
+// PopChats — main app script (Supabase-backed)
 // Depends on: supabase-js CDN, supabase-config.js, supabase-client.js,
 //             auth.js, db.js (loaded in that order in index.html).
 // =====================================================================
@@ -41,10 +41,10 @@ function formatTime(ts) {
   return d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0');
 }
 function toast(text) {
-  let t = document.getElementById('chatoToast');
+  let t = document.getElementById('popchatsToast');
   if (!t) {
     t = document.createElement('div');
-    t.id = 'chatoToast';
+    t.id = 'popchatsToast';
     t.style.cssText =
       'position:fixed;bottom:88px;left:50%;transform:translateX(-50%);' +
       'background:rgba(20,20,20,0.92);color:#fff;padding:11px 20px;border-radius:100px;' +
@@ -77,7 +77,7 @@ function applyTheme(name, persist = true) {
   document.querySelectorAll('.theme-card').forEach(c =>
     c.classList.toggle('active', c.dataset.theme === name));
   if (persist && me) {
-    ChatoDB.updateMyProfile({ theme: name }).catch(err => console.error(err));
+    PopChatsDB.updateMyProfile({ theme: name }).catch(err => console.error(err));
     me.theme = name;
   }
 }
@@ -102,7 +102,7 @@ function showScreen(name, navView) {
 async function loadChatList() {
   if (!chatList) return;
   chatList.innerHTML = '<div style="padding:24px;text-align:center;color:#9a9488;font-size:13px;">Loading…</div>';
-  const chats = await ChatoDB.listMyChats();
+  const chats = await PopChatsDB.listMyChats();
   chatList.innerHTML = '';
   if (!chats.length) {
     chatList.innerHTML =
@@ -136,7 +136,7 @@ async function loadChatList() {
 async function openChat(chatId, otherProfile) {
   let other = otherProfile;
   if (!other) {
-    const members = await ChatoDB.getChatMembers(chatId);
+    const members = await PopChatsDB.getChatMembers(chatId);
     other = members.find(m => m.id !== (me && me.id)) || null;
   }
   activeChat = { id: chatId, other };
@@ -146,13 +146,13 @@ async function openChat(chatId, otherProfile) {
   convSt.textContent = other && other.online ? 'Online' : 'Offline';
   showScreen('conv');
   await renderMessages(chatId);
-  if (messageSub) { ChatoDB.unsubscribe(messageSub); messageSub = null; }
-  messageSub = ChatoDB.subscribeToChat(chatId, (m) => appendMessage(m));
+  if (messageSub) { PopChatsDB.unsubscribe(messageSub); messageSub = null; }
+  messageSub = PopChatsDB.subscribeToChat(chatId, (m) => appendMessage(m));
 }
 
 async function renderMessages(chatId) {
   msgBox.innerHTML = '';
-  const list = await ChatoDB.listMessages(chatId);
+  const list = await PopChatsDB.listMessages(chatId);
   list.forEach((m, i) => appendMessage(m, false, i));
   requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
 }
@@ -176,7 +176,7 @@ async function sendMsg() {
   if (!txt || !activeChat) return;
   msgInput.value = '';
   try {
-    await ChatoDB.sendMessage(activeChat.id, txt);
+    await PopChatsDB.sendMessage(activeChat.id, txt);
   } catch (e) {
     console.error(e);
     toast('Failed to send: ' + (e.message || 'unknown error'));
@@ -203,7 +203,7 @@ async function searchUser() {
   const q = userIdInput.value.trim().replace(/^@/, '');
   if (!q) { modalResult.innerHTML = '<p class="result-msg">Type a username to search.</p>'; return; }
   modalResult.innerHTML = '<p class="result-msg">Searching…</p>';
-  const users = await ChatoDB.searchProfiles(q);
+  const users = await PopChatsDB.searchProfiles(q);
   const filtered = users.filter(u => u.id !== (me && me.id));
   if (!filtered.length) {
     modalResult.innerHTML = '<p class="result-msg">No user found. Try another username.</p>';
@@ -224,7 +224,7 @@ async function searchUser() {
       const uid = btn.dataset.uid;
       const other = filtered.find(x => x.id === uid);
       try {
-        const chatId = await ChatoDB.getOrCreateDM(uid);
+        const chatId = await PopChatsDB.getOrCreateDM(uid);
         closeModal();
         await loadChatList();
         openChat(chatId, other);
@@ -258,16 +258,16 @@ async function startStrangerMatch() {
   strangerTimer = setTimeout(async () => {
     clearInterval(strangerDotTimer);
     try {
-      const strangerId = await ChatoDB.pickRandomStranger();
+      const strangerId = await PopChatsDB.pickRandomStranger();
       if (!strangerId) {
         strangerStatus.textContent = 'No one available';
         strangerSub.textContent = 'Try again in a bit';
         return;
       }
-      const stranger = await ChatoDB.getProfile(strangerId);
+      const stranger = await PopChatsDB.getProfile(strangerId);
       strangerStatus.textContent = 'Match found!';
       strangerSub.textContent = 'Connected with ' + (stranger.display_name || stranger.username);
-      const chatId = await ChatoDB.startStrangerChat(strangerId);
+      const chatId = await PopChatsDB.startStrangerChat(strangerId);
       setTimeout(async () => {
         screenStranger.classList.remove('active');
         await loadChatList();
@@ -353,7 +353,7 @@ async function handleAuthSubmit() {
         goBtn.disabled = false;
         return;
       }
-      const res = await ChatoAuth.signUp(email, password, username);
+      const res = await PopChatsAuth.signUp(email, password, username);
       if (res.error) throw res.error;
       if (!res.data.session) {
         showVerifyEmailDialog(email);
@@ -362,7 +362,7 @@ async function handleAuthSubmit() {
       }
       await bootAuthed(res.data.user);
     } else {
-      const res = await ChatoAuth.signIn(email, password);
+      const res = await PopChatsAuth.signIn(email, password);
       if (res.error) throw res.error;
       if (res.data && res.data.user) await bootAuthed(res.data.user);
     }
@@ -379,7 +379,7 @@ async function handleGoogleSignIn() {
   try {
     const { error } = await window.sb.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.CHATO_SITE_URL }
+      options: { redirectTo: window.POPCHATS_SITE_URL }
     });
     if (error) throw error;
   } catch (e) {
@@ -419,7 +419,7 @@ async function submitForgot() {
   msgEl.style.color = '#9a9488';
   if (!email) { msgEl.textContent = 'Enter your email.'; return; }
   msgEl.textContent = 'Sending…';
-  const res = await ChatoAuth.resetPassword(email);
+  const res = await PopChatsAuth.resetPassword(email);
   if (res.error) {
     msgEl.style.color = '#c14040';
     msgEl.textContent = res.error.message;
@@ -444,7 +444,7 @@ function refreshProfileScreen() {
 async function loadNotificationsScreen() {
   const container = document.querySelector('#screenNotifications .notif-list');
   if (!container) return;
-  const items = await ChatoDB.listNotifications();
+  const items = await PopChatsDB.listNotifications();
   if (!items.length) {
     container.innerHTML =
       '<div style="padding:30px;text-align:center;color:#9a9488;font-size:13px;">' +
@@ -465,7 +465,7 @@ async function loadNotificationsScreen() {
 async function loadCallsScreen() {
   const container = document.querySelector('#screenCalls .notif-list');
   if (!container || !me) return;
-  const calls = await ChatoDB.listCalls();
+  const calls = await PopChatsDB.listCalls();
   if (!calls.length) {
     container.innerHTML =
       '<div style="padding:30px;text-align:center;color:#9a9488;font-size:13px;">' +
@@ -475,7 +475,7 @@ async function loadCallsScreen() {
   // fetch counterparts
   const otherIds = [...new Set(calls.map(c => c.caller_id === me.id ? c.callee_id : c.caller_id))];
   const profilesMap = {};
-  await Promise.all(otherIds.map(async id => { profilesMap[id] = await ChatoDB.getProfile(id); }));
+  await Promise.all(otherIds.map(async id => { profilesMap[id] = await PopChatsDB.getProfile(id); }));
   container.innerHTML = calls.map(c => {
     const otherId = c.caller_id === me.id ? c.callee_id : c.caller_id;
     const other = profilesMap[otherId] || {};
@@ -505,14 +505,14 @@ async function bootAuthed(user) {
   }
   bootingAuthed = true;
   try {
-    me = await ChatoDB.getMyProfile();
+    me = await PopChatsDB.getMyProfile();
     if (!me) {
       const fallbackUsername = ((user && user.email) || 'user_' + Date.now()).split('@')[0];
       try {
-        me = await ChatoDB.upsertMyProfile({ username: fallbackUsername, display_name: fallbackUsername });
+        me = await PopChatsDB.upsertMyProfile({ username: fallbackUsername, display_name: fallbackUsername });
       } catch (e) { console.error('profile init failed', e); }
     }
-    try { await ChatoDB.markOnline(true); } catch (e) { console.error(e); }
+    try { await PopChatsDB.markOnline(true); } catch (e) { console.error(e); }
     applyTheme(me && me.theme ? me.theme : 'lavender', false);
     showScreen('chats', 'chats');
     await loadChatList();
@@ -527,7 +527,7 @@ async function bootAuthed(user) {
 
 function bootUnauthed() {
   me = null;
-  if (messageSub) { ChatoDB.unsubscribe(messageSub); messageSub = null; }
+  if (messageSub) { PopChatsDB.unsubscribe(messageSub); messageSub = null; }
   showScreen('login');
 }
 
@@ -539,7 +539,7 @@ function bootUnauthed() {
 
   // Back buttons
   document.getElementById('backBtn').addEventListener('click', () => {
-    if (messageSub) { ChatoDB.unsubscribe(messageSub); messageSub = null; }
+    if (messageSub) { PopChatsDB.unsubscribe(messageSub); messageSub = null; }
     showScreen('chats', 'chats');
     loadChatList();
   });
@@ -617,9 +617,9 @@ function bootUnauthed() {
     if (signOutBtn.dataset.busy === '1') return;
     signOutBtn.dataset.busy = '1';
     try {
-      try { await ChatoDB.markOnline(false); } catch (_) {}
-      try { if (messageSub) { ChatoDB.unsubscribe(messageSub); messageSub = null; } } catch (_) {}
-      const { error } = await ChatoAuth.signOut();
+      try { await PopChatsDB.markOnline(false); } catch (_) {}
+      try { if (messageSub) { PopChatsDB.unsubscribe(messageSub); messageSub = null; } } catch (_) {}
+      const { error } = await PopChatsAuth.signOut();
       if (error) {
         console.error('signOut error', error);
         toast(error.message || 'Sign out failed');
@@ -644,7 +644,7 @@ function bootUnauthed() {
   });
 
   // Auth state
-  ChatoAuth.onAuthChange(async (event, session) => {
+  PopChatsAuth.onAuthChange(async (event, session) => {
     if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
       if (session) await bootAuthed(session.user); else bootUnauthed();
     } else if (event === 'SIGNED_OUT') {
@@ -654,7 +654,7 @@ function bootUnauthed() {
     }
   });
 
-  const session = await ChatoAuth.getSession();
+  const session = await PopChatsAuth.getSession();
   if (session) await bootAuthed(session.user);
   else bootUnauthed();
 
@@ -678,7 +678,7 @@ function bootUnauthed() {
 
   // Mark offline on page hide
   window.addEventListener('beforeunload', () => {
-    if (me) { ChatoDB.markOnline(false); }
+    if (me) { PopChatsDB.markOnline(false); }
   });
 
   // Online count badge in random-chat card
@@ -686,7 +686,7 @@ function bootUnauthed() {
     const badge = document.getElementById('randomBadge');
     if (!badge) return;
     async function refresh() {
-      const n = await ChatoDB.countOnline();
+      const n = await PopChatsDB.countOnline();
       const span = badge.querySelectorAll('span')[1];
       if (span) span.textContent = (n || 0) + ' online';
     }

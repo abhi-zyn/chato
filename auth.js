@@ -1,5 +1,5 @@
-// Chato — Auth helpers (sign up / in / out / forgot / reset)
-window.ChatoAuth = (function () {
+// PopChats — Auth helpers (sign up / in / out / forgot / reset)
+window.PopChatsAuth = (function () {
   function client() { return window.sb; }
 
   async function signUp(email, password, username) {
@@ -8,7 +8,7 @@ window.ChatoAuth = (function () {
       password,
       options: {
         data: { username, display_name: username },
-        emailRedirectTo: window.CHATO_SITE_URL
+        emailRedirectTo: window.POPCHATS_SITE_URL
       }
     });
   }
@@ -23,7 +23,7 @@ window.ChatoAuth = (function () {
 
   async function resetPassword(email) {
     return await client().auth.resetPasswordForEmail(email, {
-      redirectTo: window.CHATO_SITE_URL + 'reset.html'
+      redirectTo: window.POPCHATS_SITE_URL + 'reset.html'
     });
   }
 
