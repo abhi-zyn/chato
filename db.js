@@ -135,7 +135,28 @@ window.PopChatsDB = (function () {
         last_text: last ? last.text : '',
         last_time: last ? last.created_at : c.created_at
       };
-    }).sort((a, b) => new Date(b.last_time) - new Date(a.last_time));
+    })
+    // Dedupe DM chats by other-user id: keep the most recent one per user.
+    .reduce((acc, chat) => {
+      // Keep stranger chats untouched (each is its own session)
+      if (chat.is_stranger || !chat.other) {
+        acc.push(chat);
+        return acc;
+      }
+      const key = chat.other.id;
+      const existingIdx = acc.findIndex(c =>
+        !c.is_stranger && c.other && c.other.id === key);
+      if (existingIdx === -1) {
+        acc.push(chat);
+      } else {
+        // Keep the newest by last_time
+        if (new Date(chat.last_time) > new Date(acc[existingIdx].last_time)) {
+          acc[existingIdx] = chat;
+        }
+      }
+      return acc;
+    }, [])
+    .sort((a, b) => new Date(b.last_time) - new Date(a.last_time));
   }
 
   async function getChatMembers(chatId) {

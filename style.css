@@ -13,6 +13,9 @@ html,body { height:100%; width:100%; overflow:hidden; overscroll-behavior:none; 
 /* SCREENS — absolute, full stack */
 .screen{position:absolute;top:0;left:0;right:0;bottom:80px;display:none;flex-direction:column;overflow:hidden;animation:fadeIn 0.28s ease forwards}
 .screen.active{display:flex}
+/* Conv screen: nav is hidden, so use full height */
+#screenConv{bottom:0}
+#screenConv .input-wrap{padding-bottom:max(14px, env(safe-area-inset-bottom))}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
 /* Reusable scroll area */

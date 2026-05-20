@@ -135,9 +135,7 @@
           <div class="profile-name">Duygu Özarslan</div>
         </div>
         <div class="profile-handle">@elmasokori</div>
-        <div class="profile-stats">
-          <div class="stat-item"><div class="stat-value">37</div><div class="stat-label">Friends</div></div>
-        </div>
+        <div class="profile-bio" id="profileBio" style="display:none"></div>
       </div>
       <div class="profile-card" style="padding:10px 20px">
         <div class="menu-list">
@@ -304,6 +302,14 @@
           <button type="button" class="gender-chip" data-gender="other">Other</button>
           <button type="button" class="gender-chip" data-gender="prefer_not">Prefer not to say</button>
         </div>
+      </div>
+
+      <div class="onboard-field">
+        <label>Bio <span class="onboard-optional">optional</span></label>
+        <div class="onboard-input-wrap onboard-textarea-wrap">
+          <textarea id="onboardBio" placeholder="Tell people a bit about yourself…" maxlength="160" rows="3"></textarea>
+        </div>
+        <div class="onboard-bio-counter" id="onboardBioCounter">0 / 160</div>
       </div>
     </div>
 

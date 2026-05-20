@@ -359,3 +359,64 @@ body.modal-open { overflow: hidden; }
   padding: 6px 12px;
   border-radius: 100px;
 }
+
+
+.onboard-optional {
+  font-size: 9px;
+  background: rgba(155, 148, 136, 0.15);
+  color: #9a9488;
+  padding: 2px 7px;
+  border-radius: 100px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.onboard-textarea-wrap { padding: 10px 14px; }
+.onboard-textarea-wrap textarea {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  font-family: 'Geist', sans-serif;
+  color: #1a1a18;
+  resize: none;
+  line-height: 1.45;
+}
+.onboard-textarea-wrap textarea::placeholder { color: #c4bcae; }
+.onboard-bio-counter {
+  font-size: 11px;
+  color: #c4bcae;
+  text-align: right;
+  margin-top: 4px;
+  padding: 0 4px;
+}
+
+/* Profile bio */
+.profile-bio {
+  font-size: 13.5px;
+  color: #4a4a4a;
+  line-height: 1.55;
+  text-align: center;
+  margin-top: 12px;
+  padding: 0 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Sending pop animation */
+@keyframes msgSendPop {
+  0%   { opacity: 0; transform: translateY(20px) scale(0.85); }
+  60%  { opacity: 1; transform: translateY(-2px) scale(1.04); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.msg-row.just-sent {
+  animation: msgSendPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+}
+.msg-row.just-sent .msg-bubble {
+  box-shadow: 0 8px 24px rgba(244, 113, 58, 0.18), inset 0 1px 0 rgba(255,255,255,0.4) !important;
+  transition: box-shadow 0.6s ease;
+}
+.msg-row.just-sent.settled .msg-bubble {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.35) !important;
+}

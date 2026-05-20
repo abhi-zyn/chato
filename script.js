@@ -67,6 +67,8 @@ const themes = {
   sunset:   { bg:'linear-gradient(135deg,#fff3e0 0%,#ffe0b2 50%,#ffcc80 100%)',
               orb1:'rgba(255,204,128,0.8)', orb2:'rgba(255,224,178,0.7)', orb3:'rgba(255,243,224,0.6)' },
 };
+const THEME_STORAGE_KEY = 'popchats.theme';
+
 function applyTheme(name, persist = true) {
   const t = themes[name]; if (!t) return;
   document.body.style.background = t.bg;
@@ -76,9 +78,8 @@ function applyTheme(name, persist = true) {
   if (orbs[2]) orbs[2].style.background = t.orb3;
   document.querySelectorAll('.theme-card').forEach(c =>
     c.classList.toggle('active', c.dataset.theme === name));
-  if (persist && me) {
-    PopChatsDB.updateMyProfile({ theme: name }).catch(err => console.error(err));
-    me.theme = name;
+  if (persist) {
+    try { localStorage.setItem(THEME_STORAGE_KEY, name); } catch (_) {}
   }
 }
 
@@ -95,7 +96,9 @@ function showScreen(name, navView) {
   if (map[name]) map[name].classList.add('active');
   if (navView) setNavActive(navView);
   const nav = document.querySelector('.bottom-nav');
-  if (nav) nav.style.display = (name === 'login') ? 'none' : 'flex';
+  // Hide bottom nav on screens where it shouldn't appear
+  const hideNavOn = ['login', 'conv'];
+  if (nav) nav.style.display = hideNavOn.includes(name) ? 'none' : 'flex';
 }
 
 // ---------- chat list ----------
@@ -175,10 +178,28 @@ async function sendMsg() {
   const txt = msgInput.value.trim();
   if (!txt || !activeChat) return;
   msgInput.value = '';
+
+  // Optimistic local echo with pop animation
+  const tempId = 'temp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+  const r = document.createElement('div');
+  r.id = 'msg-' + tempId;
+  r.className = 'msg-row sent just-sent';
+  r.innerHTML =
+    `<div class="msg-bubble">${escapeHtml(txt)}</div>` +
+    `<div class="msg-time">${formatTime(new Date().toISOString())}</div>`;
+  msgBox.appendChild(r);
+  requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
+  // Settle the pop highlight after the animation
+  setTimeout(() => r.classList.add('settled'), 500);
+
   try {
-    await PopChatsDB.sendMessage(activeChat.id, txt);
+    const saved = await PopChatsDB.sendMessage(activeChat.id, txt);
+    // Replace temp row id with the real DB id so realtime echo dedupes
+    if (saved && saved.id) r.id = 'msg-' + saved.id;
   } catch (e) {
     console.error(e);
+    r.remove();
+    msgInput.value = txt; // restore so user can retry
     toast('Failed to send: ' + (e.message || 'unknown error'));
   }
 }
@@ -489,6 +510,16 @@ function refreshProfileScreen() {
     el.textContent = '@' + me.username);
   document.querySelectorAll('.profile-avatar img').forEach(el =>
     el.src = avatarOf(me));
+  // Bio
+  const bioEl = document.getElementById('profileBio');
+  if (bioEl) {
+    if (me.bio && me.bio.trim()) {
+      bioEl.textContent = me.bio;
+      bioEl.style.display = 'block';
+    } else {
+      bioEl.style.display = 'none';
+    }
+  }
 }
 
 // ---------- Onboarding modal ----------
@@ -508,6 +539,11 @@ function openOnboardingModal(authUser) {
   document.getElementById('onboardFullName').value =
     (me && me.full_name) || meta.full_name || meta.name || (me && me.display_name) || '';
   document.getElementById('onboardDob').value = (me && me.dob) || '';
+  const bioField = document.getElementById('onboardBio');
+  if (bioField) {
+    bioField.value = (me && me.bio) || '';
+    document.getElementById('onboardBioCounter').textContent = bioField.value.length + ' / 160';
+  }
 
   onboardingState = {
     gender: (me && me.gender) || null,
@@ -596,6 +632,15 @@ function initOnboardingHandlers() {
   const submitBtn = document.getElementById('onboardSubmit');
   if (submitBtn) submitBtn.addEventListener('click', submitOnboarding);
 
+  // Bio counter
+  const bioField = document.getElementById('onboardBio');
+  const bioCounter = document.getElementById('onboardBioCounter');
+  if (bioField && bioCounter) {
+    bioField.addEventListener('input', () => {
+      bioCounter.textContent = bioField.value.length + ' / 160';
+    });
+  }
+
   // Close button (only shown when editing existing profile)
   const closeBtn = document.getElementById('onboardCloseBtn');
   if (closeBtn) closeBtn.addEventListener('click', closeOnboardingModal);
@@ -617,6 +662,7 @@ async function submitOnboarding() {
   const fullName = document.getElementById('onboardFullName').value.trim();
   const dob      = document.getElementById('onboardDob').value || null;
   const gender   = onboardingState.gender;
+  const bio      = (document.getElementById('onboardBio').value || '').trim();
 
   if (!username || !/^[a-zA-Z0-9_]{3,24}$/.test(username)) {
     msgEl.textContent = 'Enter a valid username (3–24 chars, letters/numbers/_).';
@@ -646,6 +692,7 @@ async function submitOnboarding() {
       display_name: fullName,
       dob,
       gender,
+      bio: bio || null,
       onboarded: true
     };
     if (avatarUrl) patch.avatar_url = avatarUrl;
@@ -823,7 +870,7 @@ async function bootAuthed(user) {
       } catch (e) { console.error('profile init failed', e); }
     }
     try { await PopChatsDB.markOnline(true); } catch (e) { console.error(e); }
-    applyTheme(me && me.theme ? me.theme : 'lavender', false);
+    applyTheme(localStorage.getItem(THEME_STORAGE_KEY) || (me && me.theme) || 'lavender', false);
     showScreen('chats', 'chats');
     await loadChatList();
     refreshProfileScreen();
@@ -845,6 +892,12 @@ function bootUnauthed() {
 
 // ---------- Init ----------
 (async function init() {
+  // Apply saved theme immediately (before auth)
+  try {
+    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    if (savedTheme) applyTheme(savedTheme, false);
+  } catch (_) {}
+
   // Conversation send
   if (sendBtn) sendBtn.addEventListener('click', sendMsg);
   if (msgInput) msgInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendMsg(); });
