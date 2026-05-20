@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Chato — Log in</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --cream: #f5ede0;
+    --warm: #ede3d6;
+    --card: #f9f4ee;
+    --dark-card: #111110;
+    --orange: #f4713a;
+    --orange-light: #f9a876;
+    --text: #1a1a18;
+    --muted: #9a9488;
+    --border: rgba(0,0,0,0.08);
+    --input-bg: #ede8e0;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--cream);
+    font-family: 'Geist', sans-serif;
+    overflow: hidden;
+  }
+
+  /* Ambient blobs */
+  .bg {
+    position: fixed; inset: 0;
+    background: var(--cream);
+    z-index: 0;
+  }
+  .blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    pointer-events: none;
+  }
+  .blob-1 {
+    width: 420px; height: 420px;
+    background: radial-gradient(circle, #f4b896 0%, transparent 70%);
+    top: -80px; right: -60px; opacity: 0.5;
+  }
+  .blob-2 {
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, var(--orange) 0%, transparent 70%);
+    bottom: -60px; left: 10%; opacity: 0.25;
+  }
+  .blob-3 {
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, #d4c5b0 0%, transparent 70%);
+    top: 40%; left: -40px; opacity: 0.6;
+  }
+
+  /* Layout */
+  .scene {
+    position: relative; z-index: 1;
+    width: 100%; height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    gap: 16px;
+  }
+
+  /* Left login card */
+  .login-card {
+    width: 340px;
+    background: var(--card);
+    border-radius: 28px;
+    padding: 28px 26px 26px;
+    box-shadow:
+      0 2px 0 rgba(255,255,255,0.8) inset,
+      0 20px 60px rgba(100,80,60,0.15),
+      0 1px 0 rgba(0,0,0,0.04);
+    border: 1px solid rgba(255,255,255,0.7);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    animation: floatUp 0.7s cubic-bezier(0.22,1,0.36,1) both;
+  }
+
+  @keyframes floatUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 22px;
+  }
+  .brand {
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 400;
+    letter-spacing: 0.01em;
+  }
+  .signup-link {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .signup-link:hover { opacity: 0.6; }
+
+  .card-title {
+    font-family: 'Instrument Serif', serif;
+    font-size: 42px;
+    font-weight: 400;
+    color: var(--text);
+    line-height: 1;
+    margin-bottom: 6px;
+    letter-spacing: -0.02em;
+  }
+
+  .social-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    cursor: pointer;
+    margin-bottom: 20px;
+    transition: all 0.2s;
+    font-family: 'Geist', sans-serif;
+  }
+  .social-btn:hover {
+    background: #f0ebe3;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  }
+  .social-btn svg { width: 16px; height: 16px; }
+
+  .divider {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 16px;
+  }
+  .divider-line { flex: 1; height: 1px; background: var(--border); }
+  .divider-text { font-size: 11px; color: var(--muted); }
+
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--input-bg);
+    border-radius: 100px;
+    padding: 13px 18px;
+    border: 1.5px solid transparent;
+    transition: all 0.2s;
+  }
+  .input-wrap:focus-within {
+    border-color: rgba(0,0,0,0.15);
+    background: #e8e1d8;
+  }
+  .input-wrap svg { width: 15px; height: 15px; color: var(--muted); flex-shrink: 0; }
+
+  .input-wrap input {
+    flex: 1;
+    border: none; outline: none;
+    background: transparent;
+    font-size: 14px;
+    font-family: 'Geist', sans-serif;
+    color: var(--text);
+    font-weight: 400;
+  }
+  .input-wrap input::placeholder { color: var(--muted); }
+
+  .forgot {
+    font-size: 12px;
+    color: var(--muted);
+    background: white;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 100px;
+    cursor: pointer;
+    font-family: 'Geist', sans-serif;
+    transition: all 0.2s;
+  }
+  .forgot:hover { color: var(--text); }
+
+  .disclaimer {
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.5;
+    margin: 14px 0 16px;
+    padding: 0 2px;
+  }
+  .disclaimer a { color: var(--muted); text-decoration: underline; }
+
+  .login-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .login-note {
+    font-size: 11.5px;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  .toggle-btn {
+    width: 48px; height: 28px;
+    background: var(--dark-card);
+    border-radius: 100px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 3px;
+    transition: all 0.3s;
+    position: relative;
+  }
+  .toggle-btn .knob {
+    width: 22px; height: 22px;
+    background: white;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+    color: var(--dark-card);
+    transition: all 0.3s;
+    font-weight: 600;
+  }
+  .submit-row {
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .consume-text {
+    font-size: 11.5px;
+    color: var(--muted);
+    text-align: center;
+    flex: 1;
+  }
+  .go-btn {
+    width: 42px; height: 42px;
+    background: var(--dark-card);
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+    transition: all 0.25s;
+    flex-shrink: 0;
+  }
+  .go-btn:hover {
+    background: #2a2a28;
+    transform: scale(1.08);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+  }
+  .go-btn svg { width: 18px; height: 18px; }
+
+  /* Right info card */
+  .info-card {
+    width: 220px;
+    background: #faf7f3;
+    border-radius: 28px;
+    padding: 28px 24px;
+    box-shadow:
+      0 2px 0 rgba(255,255,255,0.9) inset,
+      0 20px 60px rgba(100,80,60,0.12);
+    border: 1px solid rgba(255,255,255,0.8);
+    display: flex;
+    flex-direction: column;
+    min-height: 380px;
+    position: relative;
+    overflow: hidden;
+    animation: floatUp 0.7s 0.1s cubic-bezier(0.22,1,0.36,1) both;
+  }
+
+  .info-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+  }
+  .day-label {
+    font-family: 'Instrument Serif', serif;
+    font-size: 64px;
+    font-weight: 400;
+    color: var(--text);
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+  }
+  .day-sub {
+    font-family: 'Instrument Serif', serif;
+    font-size: 64px;
+    font-weight: 400;
+    color: var(--muted);
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+  }
+  .event-label {
+    text-align: right;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* Orange orb */
+  .orb {
+    width: 130px; height: 130px;
+    background: radial-gradient(circle at 40% 35%, var(--orange-light), var(--orange) 60%, #c4501e);
+    border-radius: 50%;
+    margin: 10px auto 20px;
+    box-shadow: 0 20px 50px rgba(244,113,58,0.35), 0 0 0 1px rgba(244,113,58,0.1);
+    animation: orbFloat 4s ease-in-out infinite;
+  }
+  @keyframes orbFloat {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-8px) scale(1.02); }
+  }
+
+  .info-details {
+    font-size: 12.5px;
+    color: var(--text);
+    line-height: 1.7;
+    font-weight: 400;
+    margin-bottom: auto;
+  }
+
+  .info-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 20px;
+  }
+  .info-logo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .info-logo .star {
+    font-size: 18px;
+    color: var(--text);
+  }
+  .info-logo .logo-name {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  .join-btn {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--dark-card);
+    border-radius: 100px;
+    border: none;
+    cursor: pointer;
+    overflow: hidden;
+    transition: all 0.25s;
+  }
+  .join-btn:hover { transform: scale(1.04); box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
+  .join-btn .join-text {
+    font-size: 12px;
+    font-weight: 500;
+    color: white;
+    padding: 10px 14px;
+    font-family: 'Geist', sans-serif;
+  }
+  .join-btn .join-arrow {
+    background: #2a2a28;
+    width: 34px; height: 34px;
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+  }
+  .join-btn .join-arrow svg { width: 14px; height: 14px; }
+
+  /* Bottom dark card */
+  .dark-card {
+    position: absolute;
+    bottom: -260px; left: -10px;
+    width: 220px;
+    background: var(--dark-card);
+    border-radius: 22px;
+    padding: 22px 20px;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.3);
+    animation: floatUp 0.7s 0.2s cubic-bezier(0.22,1,0.36,1) both, slideUpCard 0.9s 0.5s cubic-bezier(0.22,1,0.36,1) forwards;
+  }
+  @keyframes slideUpCard {
+    to { bottom: -10px; }
+  }
+
+  .dark-tag {
+    font-size: 11px;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 4px;
+    font-weight: 400;
+  }
+  .dark-title {
+    font-family: 'Instrument Serif', serif;
+    font-size: 30px;
+    color: white;
+    font-weight: 400;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+  }
+  .dark-discover {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .discover-btn {
+    font-size: 13px;
+    font-weight: 500;
+    color: white;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: 'Geist', sans-serif;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+    padding: 0;
+  }
+  .discover-btn:hover { opacity: 1; }
+
+  /* Tabs (Login / Sign up) */
+  .tabs {
+    display: flex;
+    gap: 0;
+    background: var(--input-bg);
+    border-radius: 100px;
+    padding: 3px;
+    margin-bottom: 20px;
+  }
+  .tab {
+    flex: 1;
+    padding: 9px;
+    border-radius: 100px;
+    border: none;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'Geist', sans-serif;
+    cursor: pointer;
+    transition: all 0.25s;
+    background: transparent;
+    color: var(--muted);
+  }
+  .tab.active {
+    background: white;
+    color: var(--text);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
+  /* Signup extra field */
+  .username-wrap { display: none; }
+  .signup-mode .username-wrap { display: flex; }
+
+  /* Responsive */
+  @media (max-width: 620px) {
+    .scene { flex-direction: column; align-items: center; padding: 20px; gap: 12px; }
+    .login-card { width: 100%; max-width: 360px; }
+    .info-card { width: 100%; max-width: 360px; min-height: auto; }
+    .dark-card { display: none; }
+    .orb { width: 100px; height: 100px; margin: 8px auto 14px; }
+    .day-label, .day-sub { font-size: 48px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+
+<div class="scene">
+
+  <!-- LOGIN CARD -->
+  <div class="login-card" id="loginCard">
+    <div class="card-header">
+      <span class="brand">Chato</span>
+      <span class="signup-link" onclick="toggleMode()">Sign up</span>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" id="loginTab" onclick="setTab('login')">Log in</button>
+      <button class="tab" id="signupTab" onclick="setTab('signup')">Sign up</button>
+    </div>
+
+    <!-- Social -->
+    <button class="social-btn">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      </svg>
+      Continue with Google
+    </button>
+
+    <div class="divider">
+      <div class="divider-line"></div>
+      <span class="divider-text">or</span>
+      <div class="divider-line"></div>
+    </div>
+
+    <div class="input-group" id="inputGroup">
+      <!-- Username (signup only) -->
+      <div class="input-wrap username-wrap" id="usernameWrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+        </svg>
+        <input type="text" id="username" placeholder="username"/>
+      </div>
+
+      <!-- Email -->
+      <div class="input-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="2" y="4" width="20" height="16" rx="2"/>
+          <path d="M2 7l10 7 10-7"/>
+        </svg>
+        <input type="email" id="email" placeholder="e-mail address"/>
+      </div>
+
+      <!-- Password -->
+      <div class="input-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="5" y="11" width="14" height="10" rx="2"/>
+          <path d="M8 11V7a4 4 0 018 0v4"/>
+        </svg>
+        <input type="password" id="password" placeholder="password"/>
+        <button class="forgot" id="forgotBtn">I forgot</button>
+      </div>
+    </div>
+
+    <p class="disclaimer" id="disclaimer">
+      Connect with people around you. By continuing you agree to our <a href="#">terms</a> and <a href="#">privacy policy</a>.
+    </p>
+
+    <div class="submit-row">
+      <span class="consume-text" id="consumeText">Please chat responsibly!</span>
+      <button class="go-btn" onclick="handleAuth()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- RIGHT INFO CARD -->
+  <div class="info-card">
+    <div class="info-top">
+      <div>
+        <div class="day-label">Chat</div>
+        <div class="day-sub">freely</div>
+      </div>
+      <div class="event-label">Real-time<br/>messaging</div>
+    </div>
+
+    <div class="orb"></div>
+
+    <div class="info-details">
+      End-to-end encrypted<br/>
+      1-on-1 conversations<br/>
+      Find people nearby
+    </div>
+
+    <div class="info-footer">
+      <div class="info-logo">
+        <span class="star">✦</span>
+        <span class="logo-name">Chato</span>
+      </div>
+      <button class="join-btn" onclick="setTab('signup')">
+        <span class="join-text">Join in</span>
+        <span class="join-arrow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </span>
+      </button>
+    </div>
+
+    <!-- Dark card inside -->
+    <div class="dark-card">
+      <div class="dark-tag">New in</div>
+      <div class="dark-title">Chato<br/>Stranger Chat</div>
+      <div class="dark-discover">
+        <button class="discover-btn">Discover →</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let currentMode = 'login';
+
+  function setTab(mode) {
+    currentMode = mode;
+    const loginTab = document.getElementById('loginTab');
+    const signupTab = document.getElementById('signupTab');
+    const signupLink = document.querySelector('.signup-link');
+    const usernameWrap = document.getElementById('usernameWrap');
+    const forgotBtn = document.getElementById('forgotBtn');
+    const disclaimer = document.getElementById('disclaimer');
+    const consumeText = document.getElementById('consumeText');
+
+    if (mode === 'signup') {
+      loginTab.classList.remove('active');
+      signupTab.classList.add('active');
+      usernameWrap.style.display = 'flex';
+      forgotBtn.style.display = 'none';
+      signupLink.textContent = 'Log in';
+      signupLink.onclick = () => setTab('login');
+      disclaimer.textContent = 'By signing up you agree to our terms and privacy policy.';
+      consumeText.textContent = 'Join the conversation!';
+    } else {
+      loginTab.classList.add('active');
+      signupTab.classList.remove('active');
+      usernameWrap.style.display = 'none';
+      forgotBtn.style.display = '';
+      signupLink.textContent = 'Sign up';
+      signupLink.onclick = () => setTab('signup');
+      disclaimer.textContent = 'Connect with people around you. By continuing you agree to our terms and privacy policy.';
+      consumeText.textContent = 'Please chat responsibly!';
+    }
+  }
+
+  function toggleMode() {
+    setTab(currentMode === 'login' ? 'signup' : 'login');
+  }
+
+  function handleAuth() {
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+
+    if (!email || !password) {
+      shake(document.querySelector('.login-card'));
+      return;
+    }
+
+    if (currentMode === 'signup') {
+      const username = document.getElementById('username').value;
+      if (!username) { shake(document.querySelector('.login-card')); return; }
+      console.log('Signup:', { username, email, password });
+      // → call signup() from auth.js
+    } else {
+      console.log('Login:', { email, password });
+      // → call login() from auth.js
+    }
+  }
+
+  function shake(el) {
+    el.style.animation = 'none';
+    el.offsetHeight;
+    el.style.animation = 'shake 0.4s ease';
+  }
+
+  // Add shake keyframes
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes shake {
+      0%,100%{transform:translateX(0)}
+      20%{transform:translateX(-8px)}
+      40%{transform:translateX(8px)}
+      60%{transform:translateX(-5px)}
+      80%{transform:translateX(5px)}
+    }
+  `;
+  document.head.appendChild(style);
+</script>
+</body>
+</html>
