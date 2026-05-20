@@ -313,6 +313,7 @@ function setTab(mode) {
   const disclaimer   = document.getElementById('loginDisclaimer');
   const consumeText  = document.getElementById('consumeText');
   const signupLink   = document.querySelector('.signup-link');
+  const btnLabel     = document.getElementById('loginBtnLabel');
 
   if (mode === 'signup') {
     loginTab.classList.remove('active');
@@ -323,6 +324,7 @@ function setTab(mode) {
     signupLink.setAttribute('onclick', "setTab('login')");
     disclaimer.textContent = 'By signing up you agree to our terms and privacy policy.';
     consumeText.textContent = 'Join the conversation!';
+    if (btnLabel) btnLabel.textContent = 'Sign up';
   } else {
     loginTab.classList.add('active');
     signupTab.classList.remove('active');
@@ -332,6 +334,7 @@ function setTab(mode) {
     signupLink.setAttribute('onclick', "setTab('signup')");
     disclaimer.textContent = 'Connect with people around you. By continuing you agree to our terms and privacy policy.';
     consumeText.textContent = 'Please chat responsibly!';
+    if (btnLabel) btnLabel.textContent = 'Log in';
   }
 }
 window.setTab = setTab;
@@ -369,6 +372,7 @@ async function handleAuthSubmit() {
   }
   const goBtn = document.getElementById('loginGoBtn');
   goBtn.disabled = true;
+  goBtn.classList.add('is-loading');
   try {
     // Pre-check: does this email exist?
     const exists = await PopChatsDB.emailExists(email);
@@ -380,21 +384,18 @@ async function handleAuthSubmit() {
         setTab('login');
         document.getElementById('loginPassword').value = '';
         document.getElementById('loginPassword').focus();
-        goBtn.disabled = false;
         return;
       }
       const username = document.getElementById('loginUsername').value.trim();
-      if (!username) { shakeLogin(); goBtn.disabled = false; return; }
+      if (!username) { shakeLogin(); return; }
       if (!/^[a-zA-Z0-9_]{3,24}$/.test(username)) {
         toast('Username: 3–24 chars, letters/numbers/underscore.');
         shakeLogin();
-        goBtn.disabled = false;
         return;
       }
       if (password.length < 6) {
         toast('Password must be at least 6 characters.');
         shakeLogin();
-        goBtn.disabled = false;
         return;
       }
       const res = await PopChatsAuth.signUp(email, password, username);
@@ -412,7 +413,6 @@ async function handleAuthSubmit() {
         shakeLogin();
         setTab('signup');
         document.getElementById('loginPassword').value = '';
-        goBtn.disabled = false;
         return;
       }
       const res = await PopChatsAuth.signIn(email, password);
@@ -443,11 +443,18 @@ async function handleAuthSubmit() {
     shakeLogin();
   } finally {
     goBtn.disabled = false;
+    goBtn.classList.remove('is-loading');
   }
 }
 
 // ---------- Google OAuth ----------
 async function handleGoogleSignIn() {
+  const btn = document.getElementById('googleBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+    btn.style.cursor = 'wait';
+  }
   try {
     const { error } = await window.sb.auth.signInWithOAuth({
       provider: 'google',
@@ -456,6 +463,11 @@ async function handleGoogleSignIn() {
     if (error) throw error;
   } catch (e) {
     toast(e.message || 'Google sign-in failed');
+    if (btn) {
+      btn.disabled = false;
+      btn.style.opacity = '';
+      btn.style.cursor = '';
+    }
   }
 }
 
