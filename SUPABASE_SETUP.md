@@ -23,6 +23,24 @@
      - `https://abhi-zyn.github.io/chato/`
      - `https://abhi-zyn.github.io/chato/reset.html`
 
+### Google OAuth (required for "Continue with Google")
+
+The Google button needs both Supabase and Google Cloud configured:
+
+1. **Google Cloud Console** (https://console.cloud.google.com):
+   - Create a project (or use existing)
+   - Go to **APIs & Services → Credentials → Create Credentials → OAuth client ID**
+   - Application type: **Web application**
+   - Authorized redirect URIs: `https://vnrfmumsauwvpfiruryc.supabase.co/auth/v1/callback`
+   - Copy the **Client ID** and **Client Secret**
+2. **Supabase Dashboard → Authentication → Providers → Google**:
+   - Toggle **Enabled** on
+   - Paste the Client ID and Client Secret
+   - Save
+3. Test by clicking "Continue with Google" on the login screen.
+
+If Google is not configured, the button will throw "Provider is not enabled" — that's expected until you finish the steps above.
+
 ## 4. Deploy to GitHub Pages
 
 Push all files to your repo's deployment branch. The files needed:

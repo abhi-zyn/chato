@@ -342,14 +342,18 @@ async function handleAuthSubmit() {
       const res = await ChatoAuth.signUp(email, password, username);
       if (res.error) throw res.error;
       if (!res.data.session) {
-        toast('Check your email to confirm your account, then sign in.');
+        // Email confirmation required — show verify dialog
+        showVerifyEmailDialog(email);
         setTab('login');
         return;
       }
-      // session arrived (email confirmation off) — auth state listener will boot us
+      // Session granted immediately (confirmation off) — boot
+      await bootAuthed(res.data.user);
     } else {
       const res = await ChatoAuth.signIn(email, password);
       if (res.error) throw res.error;
+      // Don't rely solely on auth listener — boot now
+      if (res.data && res.data.user) await bootAuthed(res.data.user);
     }
   } catch (e) {
     toast(e.message || 'Authentication failed');
@@ -357,6 +361,31 @@ async function handleAuthSubmit() {
   } finally {
     goBtn.disabled = false;
   }
+}
+
+// ---------- Google OAuth ----------
+async function handleGoogleSignIn() {
+  try {
+    const { error } = await window.sb.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.CHATO_SITE_URL }
+    });
+    if (error) throw error;
+  } catch (e) {
+    toast(e.message || 'Google sign-in failed');
+  }
+}
+
+// ---------- Verify email dialog ----------
+function showVerifyEmailDialog(email) {
+  const m = document.getElementById('verifyModal');
+  if (!m) return;
+  document.getElementById('verifyEmailAddr').textContent = email;
+  m.classList.add('open');
+}
+function closeVerifyEmailDialog() {
+  const m = document.getElementById('verifyModal');
+  if (m) m.classList.remove('open');
 }
 
 // ---------- Forgot password modal ----------
@@ -456,20 +485,26 @@ async function loadCallsScreen() {
 }
 
 // ---------- Boot / auth gate ----------
+let bootingAuthed = false;
 async function bootAuthed(user) {
-  me = await ChatoDB.getMyProfile();
-  if (!me) {
-    // Profile trigger usually creates this; defensive fallback:
-    const fallbackUsername = ((user && user.email) || 'user_' + Date.now()).split('@')[0];
-    try {
-      me = await ChatoDB.upsertMyProfile({ username: fallbackUsername, display_name: fallbackUsername });
-    } catch (e) { console.error('profile init failed', e); }
+  if (bootingAuthed) return;
+  bootingAuthed = true;
+  try {
+    me = await ChatoDB.getMyProfile();
+    if (!me) {
+      const fallbackUsername = ((user && user.email) || 'user_' + Date.now()).split('@')[0];
+      try {
+        me = await ChatoDB.upsertMyProfile({ username: fallbackUsername, display_name: fallbackUsername });
+      } catch (e) { console.error('profile init failed', e); }
+    }
+    try { await ChatoDB.markOnline(true); } catch (e) { console.error(e); }
+    applyTheme(me && me.theme ? me.theme : 'lavender', false);
+    showScreen('chats', 'chats');
+    await loadChatList();
+    refreshProfileScreen();
+  } finally {
+    bootingAuthed = false;
   }
-  await ChatoDB.markOnline(true);
-  applyTheme(me && me.theme ? me.theme : 'lavender', false);
-  showScreen('chats', 'chats');
-  await loadChatList();
-  refreshProfileScreen();
 }
 
 function bootUnauthed() {
@@ -532,6 +567,18 @@ function bootUnauthed() {
   document.getElementById('loginGoBtn').addEventListener('click', handleAuthSubmit);
   document.getElementById('loginPassword').addEventListener('keydown',
     e => { if (e.key === 'Enter') handleAuthSubmit(); });
+
+  // Google OAuth
+  const googleBtn = document.getElementById('googleBtn');
+  if (googleBtn) googleBtn.addEventListener('click', handleGoogleSignIn);
+
+  // Verify email dialog
+  const verifyOk = document.getElementById('verifyOk');
+  if (verifyOk) verifyOk.addEventListener('click', closeVerifyEmailDialog);
+  const verifyModal = document.getElementById('verifyModal');
+  if (verifyModal) verifyModal.addEventListener('click', e => {
+    if (e.target === verifyModal) closeVerifyEmailDialog();
+  });
 
   // Forgot password
   const forgotBtn = document.getElementById('forgotBtn');
