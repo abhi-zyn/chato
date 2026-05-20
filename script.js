@@ -217,3 +217,76 @@ document.querySelectorAll('.nav-btn').forEach(b=>{
     }, true);
   }
 });
+
+// ===== RANDOM STRANGER CHAT =====
+const screenStranger = document.getElementById('screenStranger');
+const strangerStatus = document.getElementById('strangerStatus');
+const strangerSub    = document.getElementById('strangerSub');
+let strangerTimer = null;
+
+const strangers = [
+  {id:'s1', name:'Alex M.',      handle:'@alex_m',    avatar:'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face', msgs:[{type:'received',text:"Hey! Random chat here 👋",time:'now'},{type:'received',text:"What's up? Where are you from?",time:'now'}]},
+  {id:'s2', name:'Jamie K.',     handle:'@jamie_k',   avatar:'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop&crop=face', msgs:[{type:'received',text:"Hello stranger! 😄",time:'now'},{type:'received',text:"Feel free to say anything!",time:'now'}]},
+  {id:'s3', name:'Sam Rivera',   handle:'@sam_r',     avatar:'https://images.unsplash.com/photo-1552058544-f2b08422138a?w=100&h=100&fit=crop&crop=face', msgs:[{type:'received',text:"Oh wow, random match!",time:'now'},{type:'received',text:"Tell me something interesting about yourself!",time:'now'}]},
+];
+
+function startStrangerMatch(){
+  closeModal();
+  // Hide all normal screens, show stranger screen
+  [sChats,sConv,sProfile,sSettings].forEach(s=>s.classList.remove('active'));
+  screenStranger.classList.add('active');
+  strangerStatus.textContent = 'Finding someone...';
+  strangerSub.textContent = 'Matching you with a stranger nearby';
+
+  // Simulate matching delay
+  let dots = 0;
+  const dotTimer = setInterval(()=>{
+    dots = (dots+1) % 4;
+    strangerStatus.textContent = 'Finding someone' + '.'.repeat(dots);
+  }, 500);
+
+  strangerTimer = setTimeout(()=>{
+    clearInterval(dotTimer);
+    const stranger = strangers[Math.floor(Math.random()*strangers.length)];
+
+    strangerStatus.textContent = 'Match found!';
+    strangerSub.textContent = `Connected with ${stranger.name}`;
+
+    // Add to chats if not already there
+    if(!chats[stranger.id]){
+      chats[stranger.id] = {
+        name: stranger.name,
+        avatar: stranger.avatar,
+        status: 'Stranger · Online',
+        msgs: stranger.msgs
+      };
+    }
+
+    setTimeout(()=>{
+      screenStranger.classList.remove('active');
+      openChat(stranger.id);
+    }, 900);
+  }, 2800);
+}
+
+document.getElementById('randomChatBtn').addEventListener('click', startStrangerMatch);
+
+document.getElementById('strangerCancel').addEventListener('click', ()=>{
+  clearTimeout(strangerTimer);
+  screenStranger.classList.remove('active');
+  showScreen('chats','chats');
+});
+
+// Animate online count in modal
+function animateOnlineCount(){
+  const badge = document.getElementById('randomBadge');
+  if(!badge) return;
+  const base = 247;
+  setInterval(()=>{
+    const delta = Math.floor(Math.random()*10) - 4;
+    const count = Math.max(200, base + delta + Math.floor(Math.random()*30));
+    const span = badge.querySelectorAll('span')[1];
+    if(span) span.textContent = count+' online';
+  }, 3000);
+}
+animateOnlineCount();
