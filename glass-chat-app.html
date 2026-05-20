@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Glass Chat App</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>
+<div class="noise"></div>
+<div class="app">
+
+  <!-- CHATS -->
+  <div class="screen active" id="screenChats">
+    <div class="status-bar">
+      <span id="clockTime">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M1 18h2v-8H1v8zm4 0h2V8H5v10zm4 0h2V4H9v14zm4 0h2v-6h-2v6zm4 0h2v-4h-2v4z"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+      </div>
+    </div>
+    <div class="header">
+      <h1>Chats</h1>
+      <div class="header-actions">
+        <button class="glass-btn"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></button>
+        <button class="glass-btn"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button>
+      </div>
+    </div>
+    <div class="search-box">
+      <div class="search-bar">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" placeholder="Search Chats" />
+      </div>
+    </div>
+    <div class="scroll-area">
+      <div class="chat-list" id="chatList">
+        <div class="chat-card" data-id="1"><div class="avatar"><img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face" alt=""/></div><div class="chat-info"><div class="chat-name">Single Dad</div><div class="chat-sub">Say hi</div></div><div class="chat-meta"><div class="badge">3</div></div></div>
+        <div class="chat-card" data-id="2"><div class="avatar"><img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face" alt=""/></div><div class="chat-info"><div class="chat-name">Seong-Su</div><div class="chat-sub"><img src="https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=40&h=40&fit=crop&crop=face" alt=""/><span>it's me with my friends</span></div></div><div class="chat-meta"><div class="online"></div></div></div>
+        <div class="chat-card" data-id="3"><div class="avatar"><img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face" alt=""/></div><div class="chat-info"><div class="chat-name">Nathaniel Hanul</div><div class="chat-sub"><div class="typing"><span></span><span></span><span></span></div></div></div><div class="chat-meta"><div class="badge">2</div></div></div>
+        <div class="chat-card" data-id="4"><div class="avatar"><img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop&crop=face" alt=""/></div><div class="chat-info"><div class="chat-name">God Kingdom</div><div class="chat-sub">Say hi</div></div><div class="chat-meta"><div class="online"></div></div></div>
+        <div class="chat-card" data-id="5"><div class="avatar"><img src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=100&h=100&fit=crop&crop=face" alt=""/></div><div class="chat-info"><div class="chat-name">celebrity husband</div><div class="chat-sub"><img src="https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=40&h=40&fit=crop&crop=face" alt=""/><span>Photo</span></div></div><div class="chat-meta"><div class="badge">1</div></div></div>
+        <div class="chat-card" data-id="6"><div class="avatar"><img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face" alt=""/></div><div class="chat-info"><div class="chat-name">Mia Rose</div><div class="chat-sub">Can we meet tomorrow?</div></div><div class="chat-meta"><div class="badge">5</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONVERSATION -->
+  <div class="screen" id="screenConv">
+    <div class="conv-header">
+      <button class="back-btn" id="backBtn"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+      <div class="conv-avatar"><img id="convAvatar" src="" alt=""/></div>
+      <div class="conv-title"><h2 id="convName">Name</h2><p id="convStatus">Online</p></div>
+      <div class="header-actions">
+        <button class="glass-btn" style="width:38px;height:38px;border-radius:12px;"><svg viewBox="0 0 24 24" style="width:18px;height:18px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></button>
+        <button class="glass-btn" style="width:38px;height:38px;border-radius:12px;"><svg viewBox="0 0 24 24" style="width:18px;height:18px;"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg></button>
+      </div>
+    </div>
+    <div class="messages" id="messagesBox"></div>
+    <div class="input-wrap">
+      <div class="input-bar">
+        <button class="btn-plus"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        <input class="msg-input" id="msgInput" type="text" placeholder="Type your message..."/>
+        <button class="btn-send" id="sendBtn"><svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+        <button class="btn-mic"><svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROFILE -->
+  <div class="screen" id="screenProfile">
+    <div class="profile-top">
+      <div class="profile-header">
+        <h1>Profile</h1>
+        <button class="glass-btn"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button>
+      </div>
+      <div class="profile-avatar-wrap">
+        <div class="profile-avatar"><img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=220&h=220&fit=crop&crop=face" alt="Profile"/></div>
+      </div>
+    </div>
+    <div class="profile-body">
+      <div class="profile-card">
+        <div class="profile-name-row">
+          <div class="profile-name">Duygu Özarslan</div>
+          <div class="profile-badge"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>Premium</div>
+        </div>
+        <div class="profile-handle">@elmasokori</div>
+        <div class="profile-stats">
+          <div class="stat-item"><div class="stat-value">4</div><div class="stat-label">Posts</div></div>
+          <div class="stat-item"><div class="stat-value">22</div><div class="stat-label">Followers</div></div>
+          <div class="stat-item"><div class="stat-value">15</div><div class="stat-label">Following</div></div>
+        </div>
+      </div>
+      <div class="profile-card" style="padding:14px">
+        <div class="promo-card">
+          <div class="promo-left">
+            <div class="promo-icon"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>
+            <div class="promo-text"><div class="promo-title">Credits Exhausted!</div><div class="promo-sub">Buy credits to keep creating.</div></div>
+          </div>
+          <button class="promo-btn">Buy</button>
+        </div>
+      </div>
+      <div class="profile-card" style="padding:10px 20px">
+        <div class="menu-list">
+          <div class="menu-item"><div class="menu-item-left"><div class="menu-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div><span class="menu-label">My Photos</span></div><svg class="menu-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+          <div class="menu-item"><div class="menu-item-left"><div class="menu-icon"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div><span class="menu-label">Subscription &amp; Credits</span></div><svg class="menu-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+          <div class="menu-item"><div class="menu-item-left"><div class="menu-icon"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><span class="menu-label">Statistics</span></div><svg class="menu-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+          <div class="menu-item" id="settingsMenuItem"><div class="menu-item-left"><div class="menu-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div><span class="menu-label">Settings</span></div><svg class="menu-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="screen" id="screenSettings">
+    <div class="settings-top">
+      <div class="settings-header">
+        <button class="back-btn" id="settingsBackBtn"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <h1>Settings</h1>
+      </div>
+    </div>
+    <div class="settings-body">
+      <div class="settings-section">
+        <div class="settings-section-title">Appearance</div>
+        <div class="theme-grid">
+          <div class="theme-card active" data-theme="lavender"><div class="theme-preview preview-lavender"></div><div class="theme-info"><div class="theme-name">Lavender Blush</div><div class="theme-desc">Soft purples and pinks</div></div><div class="theme-check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+          <div class="theme-card" data-theme="ocean"><div class="theme-preview preview-ocean"></div><div class="theme-info"><div class="theme-name">Ocean Breeze</div><div class="theme-desc">Cool cyan and teal tones</div></div><div class="theme-check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+          <div class="theme-card" data-theme="sunset"><div class="theme-preview preview-sunset"></div><div class="theme-info"><div class="theme-name">Sunset Glow</div><div class="theme-desc">Warm peach and amber hues</div></div><div class="theme-check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">Account</div>
+        <div class="profile-card" style="padding:10px 20px">
+          <div class="menu-list">
+            <div class="menu-item"><div class="menu-item-left"><div class="menu-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><span class="menu-label">Edit Profile</span></div><svg class="menu-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+            <div class="menu-item"><div class="menu-item-left"><div class="menu-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><span class="menu-label">Privacy</span></div><svg class="menu-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+            <div class="menu-item"><div class="menu-item-left"><div class="menu-icon"><svg viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg></div><span class="menu-label">About</span></div><svg class="menu-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<nav class="bottom-nav">
+  <button class="nav-btn" data-view="home"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>
+  <button class="nav-btn active" data-view="chats"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>
+  <button class="nav-btn" data-view="add"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+  <button class="nav-btn" data-view="profile"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
+</nav>
+<div class="home-bar"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
