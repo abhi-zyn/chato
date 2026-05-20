@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Password — Chato</title>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#f5ede0; font-family:'Geist',sans-serif; min-height:100vh;
+           display:flex; align-items:center; justify-content:center; padding:20px; }
+    .card { width:100%; max-width:360px; background:#f9f4ee; border-radius:28px;
+            padding:30px 28px; box-shadow:0 20px 60px rgba(100,80,60,0.18),
+            0 2px 0 rgba(255,255,255,0.8) inset; border:1px solid rgba(255,255,255,0.7); }
+    h1 { font-size:20px; color:#1a1a18; margin-bottom:6px; }
+    p  { font-size:13px; color:#9a9488; line-height:1.5; margin-bottom:18px; }
+    .field { display:flex; align-items:center; background:#ede8e0; border-radius:100px;
+             padding:13px 18px; margin-bottom:10px; border:1.5px solid transparent;
+             transition:border-color .2s, background .2s; }
+    .field:focus-within { border-color: rgba(0,0,0,0.15); background:#e8e1d8; }
+    .field input { flex:1; border:none; outline:none; background:transparent;
+                   font-size:14px; font-family:'Geist',sans-serif; color:#1a1a18; }
+    button { width:100%; background:#111110; color:#fff; border:none; border-radius:100px;
+             padding:13px; font-size:14px; font-weight:500; font-family:'Geist',sans-serif;
+             cursor:pointer; margin-top:8px; transition:background .2s, transform .15s; }
+    button:hover:not(:disabled) { background:#2a2a28; }
+    button:active:not(:disabled) { transform:scale(0.98); }
+    button:disabled { opacity:0.5; cursor:default; }
+    .msg { font-size:12px; color:#9a9488; margin-top:12px; text-align:center; min-height:16px; }
+    .msg.error { color:#c14040; }
+    .msg.ok { color:#2a7a2a; }
+    a.back { color:#1a1a18; font-size:13px; display:block; text-align:center; margin-top:14px; text-decoration:none; }
+    a.back:hover { text-decoration:underline; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Reset password</h1>
+    <p>Enter a new password for your Chato account.</p>
+    <div class="field"><input type="password" id="newPass" placeholder="New password" autocomplete="new-password"/></div>
+    <div class="field"><input type="password" id="newPass2" placeholder="Confirm password" autocomplete="new-password"/></div>
+    <button id="submitBtn">Update password</button>
+    <div class="msg" id="msg"></div>
+    <a class="back" href="./">← Back to Chato</a>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="supabase-client.js"></script>
+  <script>
+    let recoveryReady = false;
+    sb.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') recoveryReady = true;
+    });
+    sb.auth.getSession().then(({ data }) => {
+      if (data.session) recoveryReady = true;
+    });
+
+    const submitBtn = document.getElementById('submitBtn');
+    const msg = document.getElementById('msg');
+
+    submitBtn.addEventListener('click', async () => {
+      const p1 = document.getElementById('newPass').value;
+      const p2 = document.getElementById('newPass2').value;
+      msg.className = 'msg';
+      if (p1.length < 6) { msg.textContent = 'Password must be at least 6 characters.'; msg.className = 'msg error'; return; }
+      if (p1 !== p2)     { msg.textContent = 'Passwords do not match.'; msg.className = 'msg error'; return; }
+      if (!recoveryReady) {
+        msg.textContent = 'Open this page from the email reset link.';
+        msg.className = 'msg error';
+        return;
+      }
+      submitBtn.disabled = true;
+      const { error } = await sb.auth.updateUser({ password: p1 });
+      if (error) {
+        msg.textContent = error.message; msg.className = 'msg error'; submitBtn.disabled = false; return;
+      }
+      msg.textContent = 'Password updated! Redirecting…';
+      msg.className = 'msg ok';
+      setTimeout(() => location.href = './', 1500);
+    });
+  </script>
+</body>
+</html>

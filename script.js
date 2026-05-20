@@ -1,321 +1,305 @@
-const chats={1:{name:"Single Dad",avatar:"https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face",status:"Online",msgs:[{type:"received",text:"Hey there! How are you doing?",time:"9:30"},{type:"sent",text:"I'm good, just working on some designs.",time:"9:32"},{type:"received",text:"That sounds exciting! Would love to see them.",time:"9:33"},{type:"sent",text:"Sure, I'll share the mockups later today.",time:"9:35"},{type:"received",text:"Can't wait! Say hi to the team too.",time:"9:36"},{type:"sent",text:"Will do! Talk soon.",time:"9:38"}]},2:{name:"Seong-Su",avatar:"https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",status:"Online",msgs:[{type:"received",text:"it's me with my friends",time:"8:00"},{type:"sent",text:"Oh wow, that's a great photo!",time:"8:05"},{type:"received",text:"Thanks! We had so much fun.",time:"8:06"},{type:"sent",text:"Where was this taken?",time:"8:08"}]},3:{name:"Nathaniel Hanul",avatar:"https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",status:"typing...",msgs:[{type:"sent",text:"Did you finish the report?",time:"10:00"},{type:"received",text:"Almost done, just finalizing the charts.",time:"10:05"},{type:"sent",text:"Great, send it over when ready.",time:"10:06"},{type:"received",text:"Will do in 10 minutes.",time:"10:08"}]},4:{name:"God Kingdom",avatar:"https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop&crop=face",status:"Online",msgs:[{type:"received",text:"Say hi",time:"Yesterday"},{type:"sent",text:"Hi! How's everything going?",time:"Yesterday"},{type:"received",text:"All good, just chilling today.",time:"Yesterday"},{type:"sent",text:"Same here. Let's catch up soon.",time:"Yesterday"}]},5:{name:"celebrity husband",avatar:"https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=100&h=100&fit=crop&crop=face",status:"Last seen 2h ago",msgs:[{type:"received",text:"Photo",time:"11:00"},{type:"sent",text:"Nice shot! What camera did you use?",time:"11:05"},{type:"received",text:"Just my phone, believe it or not.",time:"11:06"},{type:"sent",text:"The portrait mode is getting really good.",time:"11:08"}]},6:{name:"Mia Rose",avatar:"https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face",status:"Online",msgs:[{type:"received",text:"Can we meet tomorrow?",time:"8:00"},{type:"sent",text:"Sure! What time works for you?",time:"8:02"},{type:"received",text:"How about 3 PM at the cafe?",time:"8:03"},{type:"sent",text:"Perfect. See you then!",time:"8:05"},{type:"received",text:"Don't forget to bring the documents.",time:"8:06"},{type:"sent",text:"Got them ready. See you!",time:"8:08"}]}};
+// =====================================================================
+// Chato — main app script (Supabase-backed)
+// Depends on: supabase-js CDN, supabase-config.js, supabase-client.js,
+//             auth.js, db.js (loaded in that order in index.html).
+// =====================================================================
 
-const themes={lavender:{bg:"linear-gradient(135deg,#f3e7ff 0%,#ffeef8 50%,#e8e0ff 100%)",orb1:"rgba(212,196,251,0.8)",orb2:"rgba(248,205,218,0.7)",orb3:"rgba(224,195,252,0.6)"},ocean:{bg:"linear-gradient(135deg,#e0f7fa 0%,#b2ebf2 50%,#80deea 100%)",orb1:"rgba(128,222,234,0.8)",orb2:"rgba(178,235,242,0.7)",orb3:"rgba(224,247,250,0.6)"},sunset:{bg:"linear-gradient(135deg,#fff3e0 0%,#ffe0b2 50%,#ffcc80 100%)",orb1:"rgba(255,204,128,0.8)",orb2:"rgba(255,224,178,0.7)",orb3:"rgba(255,243,224,0.6)"}};
+// ---------- DOM refs ----------
+const sChats         = document.getElementById('screenChats');
+const sConv          = document.getElementById('screenConv');
+const sProfile       = document.getElementById('screenProfile');
+const sSettings      = document.getElementById('screenSettings');
+const sNotifications = document.getElementById('screenNotifications');
+const sCalls         = document.getElementById('screenCalls');
+const sLogin         = document.getElementById('screenLogin');
+const screenStranger = document.getElementById('screenStranger');
 
-const sChats=document.getElementById('screenChats');
-const sConv=document.getElementById('screenConv');
-const sProfile=document.getElementById('screenProfile');
-const sSettings=document.getElementById('screenSettings');
-const sNotifications=document.getElementById('screenNotifications');
-const sCalls=document.getElementById('screenCalls');
-const sLogin=document.getElementById('screenLogin');
-const msgBox=document.getElementById('messagesBox');
-const convAv=document.getElementById('convAvatar');
-const convNm=document.getElementById('convName');
-const convSt=document.getElementById('convStatus');
-const msgInput=document.getElementById('msgInput');
-const sendBtn=document.getElementById('sendBtn');
-let activeChat=null;
+const msgBox   = document.getElementById('messagesBox');
+const convAv   = document.getElementById('convAvatar');
+const convNm   = document.getElementById('convName');
+const convSt   = document.getElementById('convStatus');
+const msgInput = document.getElementById('msgInput');
+const sendBtn  = document.getElementById('sendBtn');
+const chatList = document.getElementById('chatList');
 
-// Bug fix: sync nav active state
-function setNavActive(view){
-  document.querySelectorAll('.nav-btn').forEach(b=>{
-    b.classList.toggle('active', b.dataset.view===view);
-  });
+let me = null;          // current profile row from public.profiles
+let activeChat = null;  // { id, other }
+let messageSub = null;  // realtime channel for active chat
+
+// ---------- helpers ----------
+const AVATAR_FALLBACK = 'https://api.dicebear.com/7.x/initials/svg?seed=';
+function avatarOf(p) {
+  if (!p) return AVATAR_FALLBACK + '?';
+  return p.avatar_url || (AVATAR_FALLBACK + encodeURIComponent(p.display_name || p.username || '?'));
 }
-
-function showScreen(n, navView){
-  [sLogin,sChats,sConv,sProfile,sSettings,sNotifications,sCalls].forEach(s=>s.classList.remove('active'));
-  const map={login:sLogin,chats:sChats,conv:sConv,profile:sProfile,settings:sSettings,notifications:sNotifications,calls:sCalls};
-  if(map[n]) map[n].classList.add('active');
-  // Sync nav — conv and settings don't have nav tab so inherit caller's
-  if(navView) setNavActive(navView);
-  if(n==='chats'){
-    activeChat=null;
-    document.querySelectorAll('.chat-card').forEach((c,i)=>{
-      c.classList.remove('show');
-      setTimeout(()=>c.classList.add('show'), i*60);
-    });
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function formatTime(ts) {
+  const d = new Date(ts);
+  return d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function toast(text) {
+  let t = document.getElementById('chatoToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'chatoToast';
+    t.style.cssText =
+      'position:fixed;bottom:88px;left:50%;transform:translateX(-50%);' +
+      'background:rgba(20,20,20,0.92);color:#fff;padding:11px 20px;border-radius:100px;' +
+      "font-family:'Geist',sans-serif;font-size:13px;z-index:9999;opacity:0;" +
+      'transition:opacity .25s;pointer-events:none;max-width:80%;text-align:center;';
+    document.body.appendChild(t);
   }
+  t.textContent = text;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3500);
 }
 
-function openChat(id){
-  const d=chats[id];
-  if(!d) return;
-  activeChat=String(id);
-  convAv.src=d.avatar;
-  convAv.alt=d.name;
-  convNm.textContent=d.name;
-  convSt.textContent=d.status;
-  // Bug fix: typing indicator only for chat 3
-  renderMsgs(d.msgs, String(id)==='3');
-  showScreen('conv');
-}
-
-function renderMsgs(list, typing){
-  msgBox.innerHTML='';
-  list.forEach((m,i)=>{
-    const r=document.createElement('div');
-    r.className=`msg-row ${m.type}`;
-    r.style.animationDelay=`${i*0.05}s`;
-    r.innerHTML=`<div class="msg-bubble">${m.text}</div><div class="msg-time">${m.time}</div>`;
-    msgBox.appendChild(r);
-  });
-  if(typing){
-    const t=document.createElement('div');
-    t.className='msg-row received';
-    t.style.animationDelay=`${list.length*0.05}s`;
-    t.innerHTML='<div class="typing-bubble"><span></span><span></span><span></span></div>';
-    msgBox.appendChild(t);
-  }
-  // Bug fix: scroll after paint
-  requestAnimationFrame(()=>{ msgBox.scrollTop=msgBox.scrollHeight; });
-}
-
-function sendMsg(){
-  const txt=msgInput.value.trim();
-  if(!txt||!activeChat) return;
-  const t=new Date();
-  const ts=t.getHours()+':'+String(t.getMinutes()).padStart(2,'0');
-  chats[activeChat].msgs.push({type:'sent',text:txt,time:ts});
-  renderMsgs(chats[activeChat].msgs, activeChat==='3');
-  msgInput.value='';
-  // Bug fix: only auto-reply for non-typing chats so typing bubble isn't displaced weirdly
-  setTimeout(()=>{
-    chats[activeChat].msgs.push({type:'received',text:'Got it! Thanks for the update.',time:ts});
-    renderMsgs(chats[activeChat].msgs, activeChat==='3');
-  },1500);
-}
-
-function applyTheme(n){
-  const t=themes[n];
-  if(!t) return;
-  document.body.style.background=t.bg;
-  const orbs=document.querySelectorAll('.orb');
-  orbs[0].style.background=t.orb1;
-  orbs[1].style.background=t.orb2;
-  orbs[2].style.background=t.orb3;
-  document.querySelectorAll('.theme-card').forEach(c=>c.classList.toggle('active',c.dataset.theme===n));
-}
-
-// Events
-sendBtn.addEventListener('click', sendMsg);
-msgInput.addEventListener('keydown', e=>{ if(e.key==='Enter') sendMsg(); });
-
-// Bug fix: back buttons sync nav
-document.getElementById('backBtn').addEventListener('click',()=>{ showScreen('chats','chats'); });
-document.getElementById('settingsBackBtn').addEventListener('click',()=>{ showScreen('profile','profile'); });
-document.getElementById('settingsMenuItem').addEventListener('click',()=>{ showScreen('settings'); });
-
-document.querySelectorAll('.chat-card').forEach(c=>{
-  c.addEventListener('click',()=>openChat(c.dataset.id));
-});
-
-document.querySelectorAll('.nav-btn').forEach(b=>{
-  b.addEventListener('click',()=>{
-    const v=b.dataset.view;
-    setNavActive(v);
-    if(v==='chats') showScreen('chats','chats');
-    else if(v==='profile') showScreen('profile','profile');
-    else if(v==='notifications') showScreen('notifications','notifications');
-    else if(v==='calls') showScreen('calls','calls');
-    // 'add' handled separately
-  });
-});
-
-document.querySelectorAll('.theme-card').forEach(c=>{
-  c.addEventListener('click',()=>applyTheme(c.dataset.theme));
-});
-
-// Initial card animation
-setTimeout(()=>{
-  document.querySelectorAll('.chat-card').forEach((c,i)=>{
-    setTimeout(()=>c.classList.add('show'), i*80);
-  });
-}, 200);
-
-// Clock — Bug fix: consistent format
-function updateClock(){
-  const n=new Date();
-  const el=document.getElementById('clockTime');
-  if(el) el.textContent=n.getHours()+':'+String(n.getMinutes()).padStart(2,'0');
-}
-updateClock();
-setInterval(updateClock, 60000);
-
-// Orb parallax
-document.addEventListener('mousemove', e=>{
-  const x=(e.clientX/window.innerWidth-0.5)*15;
-  const y=(e.clientY/window.innerHeight-0.5)*15;
-  document.querySelectorAll('.orb').forEach((o,i)=>{
-    const f=(i+1)*0.4;
-    o.style.transform=`translate(${x*f}px,${y*f}px)`;
-  });
-});
-
-// ===== NEW CHAT MODAL =====
-const modal = document.getElementById('newChatModal');
-const userIdInput = document.getElementById('userIdInput');
-const modalResult = document.getElementById('modalResult');
-
-// Mock user directory for search
-const userDirectory = {
-  'single_dad':   {id:'1', name:'Single Dad',        handle:'@single_dad',   avatar:'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face'},
-  'seongsu':      {id:'2', name:'Seong-Su',           handle:'@seongsu',      avatar:'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face'},
-  'nathaniel':    {id:'3', name:'Nathaniel Hanul',    handle:'@nathaniel',    avatar:'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face'},
-  'godkingdom':   {id:'4', name:'God Kingdom',        handle:'@godkingdom',   avatar:'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop&crop=face'},
-  'celebrity':    {id:'5', name:'celebrity husband',  handle:'@celebrity',    avatar:'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=100&h=100&fit=crop&crop=face'},
-  'miarose':      {id:'6', name:'Mia Rose',           handle:'@miarose',      avatar:'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face'},
+// ---------- themes ----------
+const themes = {
+  lavender: { bg:'linear-gradient(135deg,#f3e7ff 0%,#ffeef8 50%,#e8e0ff 100%)',
+              orb1:'rgba(212,196,251,0.8)', orb2:'rgba(248,205,218,0.7)', orb3:'rgba(224,195,252,0.6)' },
+  ocean:    { bg:'linear-gradient(135deg,#e0f7fa 0%,#b2ebf2 50%,#80deea 100%)',
+              orb1:'rgba(128,222,234,0.8)', orb2:'rgba(178,235,242,0.7)', orb3:'rgba(224,247,250,0.6)' },
+  sunset:   { bg:'linear-gradient(135deg,#fff3e0 0%,#ffe0b2 50%,#ffcc80 100%)',
+              orb1:'rgba(255,204,128,0.8)', orb2:'rgba(255,224,178,0.7)', orb3:'rgba(255,243,224,0.6)' },
 };
-
-function openModal(){
-  modal.classList.add('open');
-  userIdInput.value='';
-  modalResult.innerHTML='';
-  setTimeout(()=>userIdInput.focus(), 400);
+function applyTheme(name, persist = true) {
+  const t = themes[name]; if (!t) return;
+  document.body.style.background = t.bg;
+  const orbs = document.querySelectorAll('.orb');
+  if (orbs[0]) orbs[0].style.background = t.orb1;
+  if (orbs[1]) orbs[1].style.background = t.orb2;
+  if (orbs[2]) orbs[2].style.background = t.orb3;
+  document.querySelectorAll('.theme-card').forEach(c =>
+    c.classList.toggle('active', c.dataset.theme === name));
+  if (persist && me) {
+    ChatoDB.updateMyProfile({ theme: name }).catch(err => console.error(err));
+    me.theme = name;
+  }
 }
 
-function closeModal(){
+// ---------- screen routing ----------
+function setNavActive(view) {
+  document.querySelectorAll('.nav-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.view === view));
+}
+function showScreen(name, navView) {
+  [sLogin, sChats, sConv, sProfile, sSettings, sNotifications, sCalls]
+    .forEach(s => s && s.classList.remove('active'));
+  const map = { login:sLogin, chats:sChats, conv:sConv, profile:sProfile,
+                settings:sSettings, notifications:sNotifications, calls:sCalls };
+  if (map[name]) map[name].classList.add('active');
+  if (navView) setNavActive(navView);
+  const nav = document.querySelector('.bottom-nav');
+  if (nav) nav.style.display = (name === 'login') ? 'none' : 'flex';
+}
+
+// ---------- chat list ----------
+async function loadChatList() {
+  if (!chatList) return;
+  chatList.innerHTML = '<div style="padding:24px;text-align:center;color:#9a9488;font-size:13px;">Loading…</div>';
+  const chats = await ChatoDB.listMyChats();
+  chatList.innerHTML = '';
+  if (!chats.length) {
+    chatList.innerHTML =
+      '<div style="padding:30px;text-align:center;color:#9a9488;font-size:13px;line-height:1.6;">' +
+      'No chats yet.<br/>Tap <strong>+</strong> below to start one.' +
+      '</div>';
+    return;
+  }
+  chats.forEach((c, i) => {
+    const other = c.other;
+    const card = document.createElement('div');
+    card.className = 'chat-card';
+    card.dataset.id = c.id;
+    const name = escapeHtml(other ? (other.display_name || other.username) : 'Unknown');
+    const sub  = escapeHtml(c.last_text || (c.is_stranger ? 'Stranger chat' : 'Say hi'));
+    const dot  = other && other.online ? '<div class="online"></div>' : '';
+    card.innerHTML =
+      `<div class="avatar"><img src="${avatarOf(other)}" alt=""/></div>` +
+      `<div class="chat-info">` +
+        `<div class="chat-name">${name}</div>` +
+        `<div class="chat-sub">${sub}</div>` +
+      `</div>` +
+      `<div class="chat-meta">${dot}</div>`;
+    card.addEventListener('click', () => openChat(c.id, other));
+    chatList.appendChild(card);
+    setTimeout(() => card.classList.add('show'), i * 60);
+  });
+}
+
+// ---------- conversation ----------
+async function openChat(chatId, otherProfile) {
+  let other = otherProfile;
+  if (!other) {
+    const members = await ChatoDB.getChatMembers(chatId);
+    other = members.find(m => m.id !== (me && me.id)) || null;
+  }
+  activeChat = { id: chatId, other };
+  convAv.src = avatarOf(other);
+  convAv.alt = other ? (other.display_name || other.username) : '';
+  convNm.textContent = other ? (other.display_name || other.username) : 'Unknown';
+  convSt.textContent = other && other.online ? 'Online' : 'Offline';
+  showScreen('conv');
+  await renderMessages(chatId);
+  if (messageSub) { ChatoDB.unsubscribe(messageSub); messageSub = null; }
+  messageSub = ChatoDB.subscribeToChat(chatId, (m) => appendMessage(m));
+}
+
+async function renderMessages(chatId) {
+  msgBox.innerHTML = '';
+  const list = await ChatoDB.listMessages(chatId);
+  list.forEach((m, i) => appendMessage(m, false, i));
+  requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
+}
+
+function appendMessage(m, animate = true, idx = 0) {
+  if (document.getElementById('msg-' + m.id)) return; // de-dupe realtime echoes
+  const isMine = me && m.sender_id === me.id;
+  const r = document.createElement('div');
+  r.id = 'msg-' + m.id;
+  r.className = 'msg-row ' + (isMine ? 'sent' : 'received');
+  if (animate) r.style.animationDelay = (idx * 0.05) + 's';
+  r.innerHTML =
+    `<div class="msg-bubble">${escapeHtml(m.text)}</div>` +
+    `<div class="msg-time">${formatTime(m.created_at)}</div>`;
+  msgBox.appendChild(r);
+  requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
+}
+
+async function sendMsg() {
+  const txt = msgInput.value.trim();
+  if (!txt || !activeChat) return;
+  msgInput.value = '';
+  try {
+    await ChatoDB.sendMessage(activeChat.id, txt);
+  } catch (e) {
+    console.error(e);
+    toast('Failed to send: ' + (e.message || 'unknown error'));
+  }
+}
+
+// ---------- New chat modal (search) ----------
+const modal         = document.getElementById('newChatModal');
+const userIdInput   = document.getElementById('userIdInput');
+const modalResult   = document.getElementById('modalResult');
+
+function openModal() {
+  modal.classList.add('open');
+  userIdInput.value = '';
+  modalResult.innerHTML = '';
+  setTimeout(() => userIdInput.focus(), 400);
+}
+function closeModal() {
   modal.classList.remove('open');
   setNavActive('chats');
 }
 
-function searchUser(){
-  const q = userIdInput.value.trim().toLowerCase().replace('@','');
-  if(!q){ modalResult.innerHTML='<p class="result-msg">Type a username to search.</p>'; return; }
-
-  const match = Object.entries(userDirectory).find(([key, u])=>
-    key.includes(q) || u.name.toLowerCase().includes(q) || u.handle.replace('@','').includes(q)
-  );
-
-  if(match){
-    const u = match[1];
-    modalResult.innerHTML = `
-      <div class="result-card" id="resultCard">
-        <div class="result-avatar"><img src="${u.avatar}" alt="${u.name}"/></div>
-        <div class="result-info">
-          <div class="result-name">${u.name}</div>
-          <div class="result-handle">${u.handle}</div>
-        </div>
-        <button class="result-start-btn" data-uid="${u.id}">Chat</button>
-      </div>`;
-    document.querySelector('.result-start-btn').addEventListener('click', ()=>{
-      closeModal();
-      openChat(u.id);
-    });
-  } else {
-    modalResult.innerHTML='<p class="result-msg">No user found. Try another ID.</p>';
+async function searchUser() {
+  const q = userIdInput.value.trim().replace(/^@/, '');
+  if (!q) { modalResult.innerHTML = '<p class="result-msg">Type a username to search.</p>'; return; }
+  modalResult.innerHTML = '<p class="result-msg">Searching…</p>';
+  const users = await ChatoDB.searchProfiles(q);
+  const filtered = users.filter(u => u.id !== (me && me.id));
+  if (!filtered.length) {
+    modalResult.innerHTML = '<p class="result-msg">No user found. Try another username.</p>';
+    return;
   }
+  modalResult.innerHTML = filtered.slice(0, 5).map(u =>
+    `<div class="result-card">
+      <div class="result-avatar"><img src="${avatarOf(u)}" alt=""/></div>
+      <div class="result-info">
+        <div class="result-name">${escapeHtml(u.display_name || u.username)}</div>
+        <div class="result-handle">@${escapeHtml(u.username)}</div>
+      </div>
+      <button class="result-start-btn" data-uid="${u.id}">Chat</button>
+    </div>`
+  ).join('');
+  modalResult.querySelectorAll('.result-start-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const uid = btn.dataset.uid;
+      const other = filtered.find(x => x.id === uid);
+      try {
+        const chatId = await ChatoDB.getOrCreateDM(uid);
+        closeModal();
+        await loadChatList();
+        openChat(chatId, other);
+      } catch (e) {
+        toast('Could not start chat: ' + (e.message || 'error'));
+      }
+    });
+  });
 }
 
-document.getElementById('modalClose').addEventListener('click', closeModal);
-document.getElementById('searchUserBtn').addEventListener('click', searchUser);
-document.getElementById('userIdInput').addEventListener('keydown', e=>{ if(e.key==='Enter') searchUser(); });
-modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
-
-// Wire + nav button to open modal
-document.querySelectorAll('.nav-btn').forEach(b=>{
-  if(b.dataset.view==='add'){
-    b.addEventListener('click', e=>{
-      e.stopPropagation();
-      openModal();
-    }, true);
-  }
-});
-
-// ===== RANDOM STRANGER CHAT =====
-const screenStranger = document.getElementById('screenStranger');
+// ---------- Stranger chat ----------
 const strangerStatus = document.getElementById('strangerStatus');
 const strangerSub    = document.getElementById('strangerSub');
 let strangerTimer = null;
+let strangerDotTimer = null;
 
-const strangers = [
-  {id:'s1', name:'Alex M.',      handle:'@alex_m',    avatar:'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face', msgs:[{type:'received',text:"Hey! Random chat here 👋",time:'now'},{type:'received',text:"What's up? Where are you from?",time:'now'}]},
-  {id:'s2', name:'Jamie K.',     handle:'@jamie_k',   avatar:'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop&crop=face', msgs:[{type:'received',text:"Hello stranger! 😄",time:'now'},{type:'received',text:"Feel free to say anything!",time:'now'}]},
-  {id:'s3', name:'Sam Rivera',   handle:'@sam_r',     avatar:'https://images.unsplash.com/photo-1552058544-f2b08422138a?w=100&h=100&fit=crop&crop=face', msgs:[{type:'received',text:"Oh wow, random match!",time:'now'},{type:'received',text:"Tell me something interesting about yourself!",time:'now'}]},
-];
-
-function startStrangerMatch(){
+async function startStrangerMatch() {
   closeModal();
-  // Hide all normal screens, show stranger screen
-  [sChats,sConv,sProfile,sSettings].forEach(s=>s.classList.remove('active'));
+  [sChats, sConv, sProfile, sSettings, sNotifications, sCalls]
+    .forEach(s => s && s.classList.remove('active'));
   screenStranger.classList.add('active');
   strangerStatus.textContent = 'Finding someone...';
   strangerSub.textContent = 'Matching you with a stranger nearby';
 
-  // Simulate matching delay
   let dots = 0;
-  const dotTimer = setInterval(()=>{
-    dots = (dots+1) % 4;
+  strangerDotTimer = setInterval(() => {
+    dots = (dots + 1) % 4;
     strangerStatus.textContent = 'Finding someone' + '.'.repeat(dots);
   }, 500);
 
-  strangerTimer = setTimeout(()=>{
-    clearInterval(dotTimer);
-    const stranger = strangers[Math.floor(Math.random()*strangers.length)];
-
-    strangerStatus.textContent = 'Match found!';
-    strangerSub.textContent = `Connected with ${stranger.name}`;
-
-    // Add to chats if not already there
-    if(!chats[stranger.id]){
-      chats[stranger.id] = {
-        name: stranger.name,
-        avatar: stranger.avatar,
-        status: 'Stranger · Online',
-        msgs: stranger.msgs
-      };
+  strangerTimer = setTimeout(async () => {
+    clearInterval(strangerDotTimer);
+    try {
+      const strangerId = await ChatoDB.pickRandomStranger();
+      if (!strangerId) {
+        strangerStatus.textContent = 'No one available';
+        strangerSub.textContent = 'Try again in a bit';
+        return;
+      }
+      const stranger = await ChatoDB.getProfile(strangerId);
+      strangerStatus.textContent = 'Match found!';
+      strangerSub.textContent = 'Connected with ' + (stranger.display_name || stranger.username);
+      const chatId = await ChatoDB.startStrangerChat(strangerId);
+      setTimeout(async () => {
+        screenStranger.classList.remove('active');
+        await loadChatList();
+        openChat(chatId, stranger);
+      }, 900);
+    } catch (e) {
+      strangerStatus.textContent = 'Error';
+      strangerSub.textContent = e.message || 'Something went wrong';
     }
-
-    setTimeout(()=>{
-      screenStranger.classList.remove('active');
-      openChat(stranger.id);
-    }, 900);
-  }, 2800);
+  }, 2400);
 }
 
-document.getElementById('randomChatBtn').addEventListener('click', startStrangerMatch);
-
-document.getElementById('strangerCancel').addEventListener('click', ()=>{
-  clearTimeout(strangerTimer);
-  screenStranger.classList.remove('active');
-  showScreen('chats','chats');
-});
-
-// Animate online count in modal
-function animateOnlineCount(){
-  const badge = document.getElementById('randomBadge');
-  if(!badge) return;
-  const base = 247;
-  setInterval(()=>{
-    const delta = Math.floor(Math.random()*10) - 4;
-    const count = Math.max(200, base + delta + Math.floor(Math.random()*30));
-    const span = badge.querySelectorAll('span')[1];
-    if(span) span.textContent = count+' online';
-  }, 3000);
-}
-animateOnlineCount();
-
-// ===== LOGIN SCREEN =====
+// ---------- Login screen ----------
 let loginMode = 'login';
 
-function setTab(mode){
+function setTab(mode) {
   loginMode = mode;
-  const loginTab = document.getElementById('loginTab');
-  const signupTab = document.getElementById('signupTab');
+  const loginTab     = document.getElementById('loginTab');
+  const signupTab    = document.getElementById('signupTab');
   const usernameWrap = document.getElementById('usernameWrap');
-  const forgotBtn = document.getElementById('forgotBtn');
-  const disclaimer = document.getElementById('loginDisclaimer');
-  const consumeText = document.getElementById('consumeText');
-  const signupLink = document.querySelector('.signup-link');
+  const forgotBtn    = document.getElementById('forgotBtn');
+  const disclaimer   = document.getElementById('loginDisclaimer');
+  const consumeText  = document.getElementById('consumeText');
+  const signupLink   = document.querySelector('.signup-link');
 
-  if(mode === 'signup'){
+  if (mode === 'signup') {
     loginTab.classList.remove('active');
     signupTab.classList.add('active');
     usernameWrap.style.display = 'flex';
     forgotBtn.style.display = 'none';
     signupLink.textContent = 'Log in';
-    signupLink.setAttribute('onclick',"setTab('login')");
+    signupLink.setAttribute('onclick', "setTab('login')");
     disclaimer.textContent = 'By signing up you agree to our terms and privacy policy.';
     consumeText.textContent = 'Join the conversation!';
   } else {
@@ -324,35 +308,298 @@ function setTab(mode){
     usernameWrap.style.display = 'none';
     forgotBtn.style.display = '';
     signupLink.textContent = 'Sign up';
-    signupLink.setAttribute('onclick',"setTab('signup')");
+    signupLink.setAttribute('onclick', "setTab('signup')");
     disclaimer.textContent = 'Connect with people around you. By continuing you agree to our terms and privacy policy.';
     consumeText.textContent = 'Please chat responsibly!';
   }
 }
+window.setTab = setTab;
 
-document.getElementById('loginGoBtn').addEventListener('click', function(){
-  const email = document.getElementById('loginEmail').value;
+function shakeLogin() {
+  const card = document.getElementById('loginCard');
+  if (!card) return;
+  card.style.animation = 'none';
+  // force reflow
+  void card.offsetHeight;
+  card.style.animation = 'shake 0.4s ease';
+}
+
+async function handleAuthSubmit() {
+  const email    = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
-  if(!email || !password){
-    const card = document.getElementById('loginCard');
-    card.style.animation = 'none';
-    card.offsetHeight;
-    card.style.animation = 'shake 0.4s ease';
+  if (!email || !password) { shakeLogin(); return; }
+  const goBtn = document.getElementById('loginGoBtn');
+  goBtn.disabled = true;
+  try {
+    if (loginMode === 'signup') {
+      const username = document.getElementById('loginUsername').value.trim();
+      if (!username) { shakeLogin(); return; }
+      if (!/^[a-zA-Z0-9_]{3,24}$/.test(username)) {
+        toast('Username: 3–24 chars, letters/numbers/underscore.');
+        shakeLogin();
+        return;
+      }
+      const res = await ChatoAuth.signUp(email, password, username);
+      if (res.error) throw res.error;
+      if (!res.data.session) {
+        toast('Check your email to confirm your account, then sign in.');
+        setTab('login');
+        return;
+      }
+      // session arrived (email confirmation off) — auth state listener will boot us
+    } else {
+      const res = await ChatoAuth.signIn(email, password);
+      if (res.error) throw res.error;
+    }
+  } catch (e) {
+    toast(e.message || 'Authentication failed');
+    shakeLogin();
+  } finally {
+    goBtn.disabled = false;
+  }
+}
+
+// ---------- Forgot password modal ----------
+function openForgotModal() {
+  const m = document.getElementById('forgotModal');
+  if (!m) return;
+  m.classList.add('open');
+  const emailField = document.getElementById('forgotEmail');
+  emailField.value = document.getElementById('loginEmail').value || '';
+  document.getElementById('forgotMsg').textContent = '';
+  setTimeout(() => emailField.focus(), 250);
+}
+function closeForgotModal() {
+  const m = document.getElementById('forgotModal');
+  if (m) m.classList.remove('open');
+}
+async function submitForgot() {
+  const email = document.getElementById('forgotEmail').value.trim();
+  const msgEl = document.getElementById('forgotMsg');
+  msgEl.style.color = '#9a9488';
+  if (!email) { msgEl.textContent = 'Enter your email.'; return; }
+  msgEl.textContent = 'Sending…';
+  const res = await ChatoAuth.resetPassword(email);
+  if (res.error) {
+    msgEl.style.color = '#c14040';
+    msgEl.textContent = res.error.message;
     return;
   }
-  if(loginMode === 'signup'){
-    const username = document.getElementById('loginUsername').value;
-    if(!username){
-      const card = document.getElementById('loginCard');
-      card.style.animation = 'none';
-      card.offsetHeight;
-      card.style.animation = 'shake 0.4s ease';
-      return;
-    }
-  }
-  showScreen('chats','chats');
-  document.querySelector('.bottom-nav').style.display = 'flex';
-});
+  msgEl.style.color = '#2a7a2a';
+  msgEl.textContent = 'Check your inbox for the reset link.';
+}
 
-// Hide bottom nav on login
-document.querySelector('.bottom-nav').style.display = 'none';
+// ---------- Profile screen ----------
+function refreshProfileScreen() {
+  if (!me) return;
+  document.querySelectorAll('.profile-name').forEach(el =>
+    el.textContent = me.display_name || me.username);
+  document.querySelectorAll('.profile-handle').forEach(el =>
+    el.textContent = '@' + me.username);
+  document.querySelectorAll('.profile-avatar img').forEach(el =>
+    el.src = avatarOf(me));
+}
+
+// ---------- Notifications & Calls (history) ----------
+async function loadNotificationsScreen() {
+  const container = document.querySelector('#screenNotifications .notif-list');
+  if (!container) return;
+  const items = await ChatoDB.listNotifications();
+  if (!items.length) {
+    container.innerHTML =
+      '<div style="padding:30px;text-align:center;color:#9a9488;font-size:13px;">' +
+      'No notifications yet.</div>';
+    return;
+  }
+  container.innerHTML = items.map(n => `
+    <div class="notif-item${n.read ? '' : ' unread'}">
+      <div class="notif-info">
+        <div class="notif-text">${escapeHtml((n.payload && n.payload.text) || n.kind || 'Notification')}</div>
+        <div class="notif-time">${formatTime(n.created_at)}</div>
+      </div>
+      ${n.read ? '' : '<div class="notif-dot"></div>'}
+    </div>
+  `).join('');
+}
+
+async function loadCallsScreen() {
+  const container = document.querySelector('#screenCalls .notif-list');
+  if (!container || !me) return;
+  const calls = await ChatoDB.listCalls();
+  if (!calls.length) {
+    container.innerHTML =
+      '<div style="padding:30px;text-align:center;color:#9a9488;font-size:13px;">' +
+      'No calls yet.</div>';
+    return;
+  }
+  // fetch counterparts
+  const otherIds = [...new Set(calls.map(c => c.caller_id === me.id ? c.callee_id : c.caller_id))];
+  const profilesMap = {};
+  await Promise.all(otherIds.map(async id => { profilesMap[id] = await ChatoDB.getProfile(id); }));
+  container.innerHTML = calls.map(c => {
+    const otherId = c.caller_id === me.id ? c.callee_id : c.caller_id;
+    const other = profilesMap[otherId] || {};
+    const arrow = c.kind === 'missed' ? 'missed' : (c.caller_id === me.id ? 'outgoing' : 'incoming');
+    const sym   = arrow === 'outgoing' ? '&#8599;' : '&#8601;';
+    return `
+      <div class="notif-item">
+        <div class="avatar"><img src="${avatarOf(other)}" alt=""/></div>
+        <div class="notif-info">
+          <div class="notif-text">
+            <strong>${escapeHtml(other.display_name || other.username || 'Unknown')}</strong>
+            <div class="call-meta ${arrow}">${sym} ${arrow}</div>
+          </div>
+          <div class="notif-time">${formatTime(c.created_at)}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ---------- Boot / auth gate ----------
+async function bootAuthed(user) {
+  me = await ChatoDB.getMyProfile();
+  if (!me) {
+    // Profile trigger usually creates this; defensive fallback:
+    const fallbackUsername = ((user && user.email) || 'user_' + Date.now()).split('@')[0];
+    try {
+      me = await ChatoDB.upsertMyProfile({ username: fallbackUsername, display_name: fallbackUsername });
+    } catch (e) { console.error('profile init failed', e); }
+  }
+  await ChatoDB.markOnline(true);
+  applyTheme(me && me.theme ? me.theme : 'lavender', false);
+  showScreen('chats', 'chats');
+  await loadChatList();
+  refreshProfileScreen();
+}
+
+function bootUnauthed() {
+  me = null;
+  if (messageSub) { ChatoDB.unsubscribe(messageSub); messageSub = null; }
+  showScreen('login');
+}
+
+// ---------- Init ----------
+(async function init() {
+  // Conversation send
+  if (sendBtn) sendBtn.addEventListener('click', sendMsg);
+  if (msgInput) msgInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendMsg(); });
+
+  // Back buttons
+  document.getElementById('backBtn').addEventListener('click', () => {
+    if (messageSub) { ChatoDB.unsubscribe(messageSub); messageSub = null; }
+    showScreen('chats', 'chats');
+    loadChatList();
+  });
+  document.getElementById('settingsBackBtn').addEventListener('click',
+    () => showScreen('profile', 'profile'));
+  document.getElementById('settingsMenuItem').addEventListener('click',
+    () => showScreen('settings'));
+
+  // Bottom nav
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      const v = b.dataset.view;
+      setNavActive(v);
+      if (v === 'chats')         { showScreen('chats', 'chats'); loadChatList(); }
+      else if (v === 'profile')  { showScreen('profile', 'profile'); refreshProfileScreen(); }
+      else if (v === 'notifications') { showScreen('notifications', 'notifications'); loadNotificationsScreen(); }
+      else if (v === 'calls')    { showScreen('calls', 'calls'); loadCallsScreen(); }
+      else if (v === 'add')      openModal();
+    });
+  });
+
+  // Theme cards
+  document.querySelectorAll('.theme-card').forEach(c => {
+    c.addEventListener('click', () => applyTheme(c.dataset.theme));
+  });
+
+  // New chat modal
+  document.getElementById('modalClose').addEventListener('click', closeModal);
+  document.getElementById('searchUserBtn').addEventListener('click', searchUser);
+  userIdInput.addEventListener('keydown', e => { if (e.key === 'Enter') searchUser(); });
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+  // Stranger
+  document.getElementById('randomChatBtn').addEventListener('click', startStrangerMatch);
+  document.getElementById('strangerCancel').addEventListener('click', () => {
+    clearTimeout(strangerTimer);
+    clearInterval(strangerDotTimer);
+    screenStranger.classList.remove('active');
+    showScreen('chats', 'chats');
+  });
+
+  // Login form
+  document.getElementById('loginGoBtn').addEventListener('click', handleAuthSubmit);
+  document.getElementById('loginPassword').addEventListener('keydown',
+    e => { if (e.key === 'Enter') handleAuthSubmit(); });
+
+  // Forgot password
+  const forgotBtn = document.getElementById('forgotBtn');
+  if (forgotBtn) forgotBtn.addEventListener('click', openForgotModal);
+  const forgotClose = document.getElementById('forgotClose');
+  if (forgotClose) forgotClose.addEventListener('click', closeForgotModal);
+  const forgotSubmit = document.getElementById('forgotSubmit');
+  if (forgotSubmit) forgotSubmit.addEventListener('click', submitForgot);
+  const forgotModal = document.getElementById('forgotModal');
+  if (forgotModal) forgotModal.addEventListener('click', e => {
+    if (e.target === forgotModal) closeForgotModal();
+  });
+
+  // Sign-out
+  const signOutBtn = document.getElementById('signOutBtn');
+  if (signOutBtn) signOutBtn.addEventListener('click', async () => {
+    try { await ChatoDB.markOnline(false); } catch (_) {}
+    await ChatoAuth.signOut();
+  });
+
+  // Auth state
+  ChatoAuth.onAuthChange(async (event, session) => {
+    if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+      if (session) await bootAuthed(session.user); else bootUnauthed();
+    } else if (event === 'SIGNED_OUT') {
+      bootUnauthed();
+    } else if (event === 'PASSWORD_RECOVERY') {
+      // Reset flow lives on reset.html; ignore here.
+    }
+  });
+
+  const session = await ChatoAuth.getSession();
+  if (session) await bootAuthed(session.user);
+  else bootUnauthed();
+
+  // Clock
+  function updateClock() {
+    const n = new Date();
+    const el = document.getElementById('clockTime');
+    if (el) el.textContent = n.getHours() + ':' + String(n.getMinutes()).padStart(2,'0');
+  }
+  updateClock(); setInterval(updateClock, 60000);
+
+  // Orb parallax
+  document.addEventListener('mousemove', e => {
+    const x = (e.clientX / window.innerWidth - 0.5) * 15;
+    const y = (e.clientY / window.innerHeight - 0.5) * 15;
+    document.querySelectorAll('.orb').forEach((o, i) => {
+      const f = (i + 1) * 0.4;
+      o.style.transform = `translate(${x*f}px, ${y*f}px)`;
+    });
+  });
+
+  // Mark offline on page hide
+  window.addEventListener('beforeunload', () => {
+    if (me) { ChatoDB.markOnline(false); }
+  });
+
+  // Online count badge in random-chat card
+  (function tickOnline() {
+    const badge = document.getElementById('randomBadge');
+    if (!badge) return;
+    async function refresh() {
+      const n = await ChatoDB.countOnline();
+      const span = badge.querySelectorAll('span')[1];
+      if (span) span.textContent = (n || 0) + ' online';
+    }
+    refresh();
+    setInterval(refresh, 8000);
+  })();
+})();
