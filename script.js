@@ -181,7 +181,7 @@ async function loadChatList() {
     const card = document.createElement('div');
     card.className = 'chat-card';
     card.dataset.id = c.id;
-    const name = escapeHtml(other ? (other.display_name || other.username) : 'Unknown');
+    const name = escapeHtml(other ? (other.full_name || other.display_name || other.username) : 'Unknown');
     const sub  = escapeHtml(c.last_text || (c.is_stranger ? 'Stranger chat' : 'Say hi'));
     const dot  = other && other.online ? '<div class="online"></div>' : '';
     card.innerHTML =
@@ -206,8 +206,8 @@ async function openChat(chatId, otherProfile, isStranger) {
   }
   activeChat = { id: chatId, other, isStranger: !!isStranger, friendState: 'none' };
   convAv.src = avatarOf(other);
-  convAv.alt = other ? (other.display_name || other.username) : '';
-  convNm.textContent = other ? (other.display_name || other.username) : 'Unknown';
+  convAv.alt = other ? (other.full_name || other.display_name || other.username) : '';
+  convNm.textContent = other ? (other.full_name || other.display_name || other.username) : 'Unknown';
   convSt.textContent = other && other.online ? 'Online' : 'Offline';
   showScreen('conv');
   await renderMessages(chatId);
@@ -243,7 +243,7 @@ async function refreshConvFriendGate() {
     let html = '';
     if (state === 'incoming') {
       html =
-        `<div class="conv-banner-text">${escapeHtml(other.display_name || other.username)} sent you a friend request.</div>` +
+        `<div class="conv-banner-text">${escapeHtml(other.full_name || other.display_name || other.username)} sent you a friend request.</div>` +
         `<div class="conv-banner-actions">` +
           `<button class="btn-ghost" data-act="decline">Decline</button>` +
           `<button class="btn-primary" data-act="accept">Accept</button>` +
@@ -378,7 +378,7 @@ async function searchUser() {
     return `<div class="result-card" data-uid="${u.id}">
       <div class="result-avatar"><img src="${avatarOf(u)}" alt=""/></div>
       <div class="result-info">
-        <div class="result-name">${escapeHtml(u.display_name || u.username)}</div>
+        <div class="result-name">${escapeHtml(u.full_name || u.display_name || u.username)}</div>
         <div class="result-handle">@${escapeHtml(u.username)}</div>
       </div>
       ${friendActionButtonHTML(st)}
@@ -1080,7 +1080,7 @@ async function loadCallsScreen() {
         <div class="avatar"><img src="${avatarOf(other)}" alt=""/></div>
         <div class="notif-info">
           <div class="notif-text">
-            <strong>${escapeHtml(other.display_name || other.username || 'Unknown')}</strong>
+            <strong>${escapeHtml(other.full_name || other.display_name || other.username || 'Unknown')}</strong>
             <div class="call-meta ${arrow}">${sym} ${arrow}</div>
           </div>
           <div class="notif-time">${formatTime(c.created_at)}</div>
