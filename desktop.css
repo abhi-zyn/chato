@@ -352,6 +352,8 @@
   .app {
     display: flex;
     flex-direction: row;
+    height: 100vh;
+    overflow: hidden;
   }
 
   /* Override base .screen absolute positioning for desktop split */
@@ -362,6 +364,7 @@
     right: auto !important;
     bottom: auto !important;
     animation: none !important;
+    height: 100%;
   }
 
   /* Chat list panel — fixed width on left */
@@ -370,19 +373,21 @@
     min-width: 360px;
     max-width: 360px;
     flex-shrink: 0;
-    border-right: 1px solid rgba(0, 0, 0, 0.06);
+    border-right: 1px solid rgba(0, 0, 0, 0.08);
     display: flex !important;
     height: 100%;
+    overflow: hidden;
   }
   body:not(.is-authed) #screenChats { display: none !important; }
-  /* Hide chat list when other screens are active */
   body.is-authed.show-other-screen #screenChats { display: none !important; }
 
-  /* Conversation panel — fills remaining space */
+  /* Conversation panel — fills ALL remaining space */
   #screenConv {
     flex: 1;
+    min-width: 0;
     display: none !important;
     height: 100%;
+    max-width: none;
   }
   #screenConv.active {
     display: flex !important;
@@ -393,15 +398,16 @@
   .desktop-conv-empty {
     display: none;
     flex: 1;
+    min-width: 0;
     align-items: center;
     justify-content: center;
     flex-direction: column;
     height: 100%;
   }
-  body.is-authed:not(.show-other-screen) .desktop-conv-empty {
+  body.is-authed:not(.show-other-screen):not(.desktop-conv-open) .desktop-conv-empty {
     display: flex;
   }
-  body.is-authed #screenConv.active ~ .desktop-conv-empty {
+  body.is-authed.desktop-conv-open .desktop-conv-empty {
     display: none;
   }
   .conv-empty-inner {
@@ -431,18 +437,21 @@
     margin: 0;
   }
 
-  /* Other screens (profile, settings, etc.) — take full right area */
+  /* Other screens (profile, settings, notifications, calls, requests) — take full right area */
   #screenProfile,
   #screenSettings,
   #screenNotifications,
-  #screenCalls {
+  #screenCalls,
+  #screenRequests {
     flex: 1;
+    min-width: 0;
     height: 100%;
   }
   #screenProfile.active,
   #screenSettings.active,
   #screenNotifications.active,
-  #screenCalls.active {
+  #screenCalls.active,
+  #screenRequests.active {
     display: flex !important;
   }
 
@@ -452,12 +461,9 @@
   }
 }
 
-/* Larger screens: cap content width */
+/* Larger screens: no cap — let the split layout use full available width */
 @media (min-width: 1280px) {
   .app {
-    max-width: 1100px;
-    left: 50%;
-    transform: translateX(-50%);
+    max-width: none;
   }
-  body.sb-collapsed .app { max-width: 900px; }
 }
