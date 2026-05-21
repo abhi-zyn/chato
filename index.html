@@ -4,11 +4,30 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>PopChats</title>
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="login.css?v=2">
+<link rel="stylesheet" href="login.css?v=3">
+<script>
+  // Show OAuth splash IMMEDIATELY if URL has ?code= (before main script runs)
+  (function () {
+    try {
+      var p = new URLSearchParams(window.location.search);
+      if (p.has('code') || p.has('error')) {
+        document.documentElement.classList.add('oauth-callback');
+      }
+    } catch (e) {}
+  })();
+</script>
 </head>
 <body>
+<!-- OAuth Splash (shown only when html has .oauth-callback or body has .oauth-splash-on) -->
+<div id="oauthSplash" aria-hidden="true">
+  <div class="oauth-splash-card">
+    <div class="oauth-spinner"></div>
+    <div class="oauth-splash-title" id="oauthSplashTitle">Signing you in…</div>
+    <div class="oauth-splash-sub" id="oauthSplashSub">Hang tight, finishing up your session</div>
+  </div>
+</div>
 <div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>
 <div class="noise"></div>
 <div class="app">

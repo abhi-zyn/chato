@@ -60,31 +60,22 @@ function toast(text) {
 
 // ---------- OAuth splash (full-screen "Signing you in") ----------
 function showOAuthSplash(isAuth) {
-  let el = document.getElementById('oauthSplash');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'oauthSplash';
-    el.innerHTML = `
-      <div class="oauth-splash-card">
-        <div class="oauth-spinner"></div>
-        <div class="oauth-splash-title" id="oauthSplashTitle">Signing you in…</div>
-        <div class="oauth-splash-sub" id="oauthSplashSub">Hang tight, finishing up your session</div>
-      </div>`;
-    document.body.appendChild(el);
-  }
-  if (!isAuth) {
-    const t = el.querySelector('#oauthSplashTitle');
-    const s = el.querySelector('#oauthSplashSub');
-    if (t) t.textContent = 'Hmm, that didn\'t work';
+  // Splash element exists in the HTML; we just toggle visibility classes.
+  document.body.classList.add('oauth-splash-on');
+  document.documentElement.classList.add('oauth-callback');
+  const t = document.getElementById('oauthSplashTitle');
+  const s = document.getElementById('oauthSplashSub');
+  if (isAuth) {
+    if (t) t.textContent = 'Signing you in…';
+    if (s) s.textContent = 'Hang tight, finishing up your session';
+  } else {
+    if (t) t.textContent = "Hmm, that didn't work";
     if (s) s.textContent = 'Sending you back to the login screen…';
   }
-  // Force reflow before adding open class so transition fires
-  void el.offsetHeight;
-  el.classList.add('open');
 }
 function hideOAuthSplash() {
-  const el = document.getElementById('oauthSplash');
-  if (el) el.classList.remove('open');
+  document.body.classList.remove('oauth-splash-on');
+  document.documentElement.classList.remove('oauth-callback');
 }
 
 // ---------- themes ----------
