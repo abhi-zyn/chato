@@ -375,17 +375,56 @@ window.PopChatsDB = (function () {
   }
 
   // ---------- messages ----------
+  // Raw RPC helper - bypasses supabase-js client lock
+  async function rawRpc(fnName, params) {
+    const token = getSessionTokenSync();
+    if (!token) return { data: null, error: new Error('no session') };
+    try {
+      const url = `${window.SUPABASE_URL}/rest/v1/rpc/${fnName}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'apikey': window.SUPABASE_PUBLISHABLE_KEY,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(params || {})
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        return { data: null, error: new Error(`HTTP ${res.status}: ${txt}`) };
+      }
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : null;
+      return { data, error: null };
+    } catch (e) {
+      return { data: null, error: e };
+    }
+  }
+
   async function listMessages(chatId) {
-    // Try encrypted RPC first; fall back to direct query if migration not run
-    const { data, error } = await client().rpc('list_messages_decrypted', { _chat_id: chatId });
-    if (!error) return data || [];
-    console.warn('[listMessages] RPC failed, falling back to direct query:', error.message);
-    const { data: d2, error: e2 } = await client().from('messages')
-      .select('*').eq('chat_id', chatId)
-      .order('created_at', { ascending: true })
-      .limit(200);
-    if (e2) { console.error('[listMessages]', e2); return []; }
-    return d2 || [];
+    // Try encrypted RPC first via raw fetch (bypasses client lock)
+    const r1 = await rawRpc('list_messages_decrypted', { _chat_id: chatId });
+    if (!r1.error && r1.data) return r1.data;
+    
+    // Fallback to direct table query (also raw)
+    const r2 = await rawSelect('messages',
+      `chat_id=eq.${chatId}&select=*&order=created_at.asc&limit=200`);
+    if (r2.error) {
+      console.error('[listMessages]', r2.error);
+      // Last resort: client query
+      try {
+        const { data } = await client().from('messages')
+          .select('*').eq('chat_id', chatId)
+          .order('created_at', { ascending: true })
+          .limit(200);
+        return data || [];
+      } catch (e) {
+        return [];
+      }
+    }
+    return r2.data || [];
   }
 
   async function sendMessage(chatId, text) {

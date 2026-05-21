@@ -583,17 +583,20 @@ async function renderMessages(chatId) {
   if (cached && cached.length) {
     cached.forEach((m, i) => appendMessage(m, false, i));
     requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
-    // Background refresh
+    // Background refresh — but DON'T clear messages on transient failure
     PopChatsDB.listMessages(chatId).then(list => {
+      // If fetch returned empty/null, don't clobber cached messages
+      if (!list || !list.length) return;
       _cache.messages[chatId] = list;
       _cache.saveMessages();
-      // Only re-render if new messages arrived
-      if (list.length !== cached.length || (list.length && list[list.length-1].id !== cached[cached.length-1].id)) {
+      // Only re-render if user is STILL on this chat AND messages changed
+      if (activeChat && activeChat.id === chatId &&
+          (list.length !== cached.length || list[list.length-1].id !== cached[cached.length-1].id)) {
         msgBox.innerHTML = '';
         list.forEach((m, i) => appendMessage(m, false, i));
         requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
       }
-    }).catch(() => {});
+    }).catch(e => console.error('renderMessages bg:', e));
   } else {
     const list = await PopChatsDB.listMessages(chatId);
     _cache.messages[chatId] = list;
