@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="style.css?v=4">
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="login.css?v=4">
-<link rel="stylesheet" href="desktop.css?v=4">
+<link rel="stylesheet" href="desktop.css?v=5">
 <script>
   // Show splash IMMEDIATELY for EVERY load — hides after auth state resolves.
   (function () {
@@ -160,6 +160,15 @@
         <button class="btn-send" id="sendBtn"><svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
         <button class="btn-mic"><svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
       </div>
+    </div>
+  </div>
+
+  <!-- EMPTY CONV PLACEHOLDER (desktop only) -->
+  <div class="desktop-conv-empty" id="desktopConvEmpty">
+    <div class="conv-empty-inner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <h3>Your messages</h3>
+      <p>Select a conversation to start chatting</p>
     </div>
   </div>
 

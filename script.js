@@ -124,6 +124,20 @@ function navTo(v) {
   else if (v === 'add')           openModal();
 }
 function showScreen(name, navView) {
+  const isDesktop = window.innerWidth >= 768;
+
+  if (isDesktop && name === 'conv') {
+    // Desktop: keep chat list visible, just show conv panel alongside
+    sConv.classList.add('active');
+    // Hide other non-chat screens
+    [sProfile, sSettings, sNotifications, sCalls].forEach(s => s && s.classList.remove('active'));
+    document.body.classList.add('desktop-conv-open');
+    if (navView) setNavActive(navView);
+    document.body.classList.toggle('is-authed', true);
+    return;
+  }
+
+  // Normal flow
   [sLogin, sChats, sConv, sProfile, sSettings, sNotifications, sCalls]
     .forEach(s => s && s.classList.remove('active'));
   const map = { login:sLogin, chats:sChats, conv:sConv, profile:sProfile,
@@ -131,11 +145,15 @@ function showScreen(name, navView) {
   if (map[name]) map[name].classList.add('active');
   if (navView) setNavActive(navView);
   const nav = document.querySelector('.bottom-nav');
-  // Hide bottom nav on screens where it shouldn't appear
   const hideNavOn = ['login', 'conv'];
   if (nav) nav.style.display = hideNavOn.includes(name) ? 'none' : 'flex';
-  // Toggle body authed flag (drives desktop sidebar visibility)
   document.body.classList.toggle('is-authed', name !== 'login');
+  document.body.classList.remove('desktop-conv-open');
+
+  // Desktop: when switching to chats, also show chat list
+  if (isDesktop && name === 'chats') {
+    sChats.classList.add('active');
+  }
 }
 
 // ---------- chat list ----------

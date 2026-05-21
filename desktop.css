@@ -3,6 +3,7 @@
    ========================================================================= */
 
 .desktop-sidebar { display: none; }
+.desktop-conv-empty { display: none; }
 
 @media (min-width: 768px) {
 
@@ -344,6 +345,107 @@
   }
   #screenConv .input-wrap { padding-bottom: 14px; }
   #screenLogin { z-index: 60; }
+
+  /* ============================================================
+     SPLIT LAYOUT: Chat list (left) + Conversation (right)
+     ============================================================ */
+  .app {
+    display: flex;
+    flex-direction: row;
+  }
+
+  /* Chat list panel — fixed width on left */
+  #screenChats {
+    position: relative;
+    width: 340px;
+    min-width: 340px;
+    max-width: 340px;
+    flex-shrink: 0;
+    border-right: 1px solid rgba(0, 0, 0, 0.06);
+    display: flex !important;
+    bottom: 0;
+  }
+  /* Only show chat list when authed and not on login */
+  body:not(.is-authed) #screenChats { display: none !important; }
+
+  /* Conversation panel — fills remaining space */
+  #screenConv {
+    position: relative;
+    flex: 1;
+    display: none;
+    bottom: 0;
+  }
+  #screenConv.active {
+    display: flex;
+  }
+  /* Hide back button on desktop (chat list always visible) */
+  #screenConv .back-btn { display: none; }
+
+  /* Empty conversation placeholder */
+  .desktop-conv-empty {
+    display: none;
+    position: relative;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+  }
+  /* Show placeholder when conv is NOT active and we're on chats screen */
+  body.is-authed .desktop-conv-empty {
+    display: flex;
+  }
+  body.is-authed #screenConv.active ~ .desktop-conv-empty {
+    display: none;
+  }
+  .conv-empty-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    text-align: center;
+    color: #9a9488;
+    padding: 40px;
+  }
+  .conv-empty-inner svg {
+    width: 56px;
+    height: 56px;
+    color: rgba(0, 0, 0, 0.12);
+    margin-bottom: 8px;
+  }
+  .conv-empty-inner h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #4a4a4a;
+    margin: 0;
+  }
+  .conv-empty-inner p {
+    font-size: 14px;
+    color: #9a9488;
+    margin: 0;
+  }
+
+  /* Other screens (profile, settings, etc.) — overlay the right panel area */
+  #screenProfile,
+  #screenSettings,
+  #screenNotifications,
+  #screenCalls {
+    position: absolute;
+    left: 340px;
+    right: 0;
+    top: 0;
+    bottom: 0;
+  }
+  /* When these screens are active, hide the empty placeholder */
+  #screenProfile.active ~ .desktop-conv-empty,
+  #screenSettings.active ~ .desktop-conv-empty,
+  #screenNotifications.active ~ .desktop-conv-empty,
+  #screenCalls.active ~ .desktop-conv-empty {
+    display: none;
+  }
+  /* When conv is active, also keep chat list visible */
+  body.is-authed.desktop-conv-open #screenChats {
+    display: flex !important;
+  }
 }
 
 /* Larger screens: cap content width */
