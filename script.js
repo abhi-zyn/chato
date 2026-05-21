@@ -373,9 +373,20 @@ async function handleAuthSubmit() {
   const goBtn = document.getElementById('loginGoBtn');
   goBtn.disabled = true;
   goBtn.classList.add('is-loading');
+
+  // Watchdog: force-release the button if anything stalls (network, hung query, etc.)
+  const watchdog = setTimeout(() => {
+    if (goBtn.classList.contains('is-loading')) {
+      goBtn.disabled = false;
+      goBtn.classList.remove('is-loading');
+      toast('Network is slow. Please try again.');
+    }
+  }, 15000);
+
   try {
-    // Pre-check: does this email exist?
-    const exists = await PopChatsDB.emailExists(email);
+    // Pre-check: does this email exist? (best-effort, ignore failure)
+    let exists = null;
+    try { exists = await PopChatsDB.emailExists(email); } catch (_) { exists = null; }
 
     if (loginMode === 'signup') {
       if (exists === true) {
@@ -405,7 +416,8 @@ async function handleAuthSubmit() {
         setTab('login');
         return;
       }
-      await bootAuthed(res.data.user);
+      // Don't await bootAuthed — release button now; auth listener handles boot.
+      bootAuthed(res.data.user).catch(err => console.error('bootAuthed:', err));
     } else {
       // Login mode
       if (exists === false) {
@@ -426,7 +438,10 @@ async function handleAuthSubmit() {
         }
         throw res.error;
       }
-      if (res.data && res.data.user) await bootAuthed(res.data.user);
+      // Don't await bootAuthed — release button now; auth listener handles boot.
+      if (res.data && res.data.user) {
+        bootAuthed(res.data.user).catch(err => console.error('bootAuthed:', err));
+      }
     }
   } catch (e) {
     const m = (e.message || '').toLowerCase();
@@ -442,6 +457,7 @@ async function handleAuthSubmit() {
     toast(friendly);
     shakeLogin();
   } finally {
+    clearTimeout(watchdog);
     goBtn.disabled = false;
     goBtn.classList.remove('is-loading');
   }
@@ -866,6 +882,15 @@ async function loadCallsScreen() {
 
 // ---------- Boot / auth gate ----------
 let bootingAuthed = false;
+
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('timeout: ' + label)), ms))
+  ]);
+}
+
 async function bootAuthed(user) {
   if (bootingAuthed) {
     showScreen('chats', 'chats');
@@ -873,20 +898,24 @@ async function bootAuthed(user) {
   }
   bootingAuthed = true;
   try {
-    me = await PopChatsDB.getMyProfile();
+    try {
+      me = await withTimeout(PopChatsDB.getMyProfile(), 8000, 'getMyProfile');
+    } catch (e) { console.error('getMyProfile failed:', e); me = null; }
+
     if (!me) {
       const fallbackUsername = ((user && user.email) || 'user_' + Date.now()).split('@')[0]
         .replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 24);
       try {
-        me = await PopChatsDB.upsertMyProfile({ username: fallbackUsername, display_name: fallbackUsername });
+        me = await withTimeout(
+          PopChatsDB.upsertMyProfile({ username: fallbackUsername, display_name: fallbackUsername }),
+          8000, 'upsertMyProfile');
       } catch (e) { console.error('profile init failed', e); }
     }
-    try { await PopChatsDB.markOnline(true); } catch (e) { console.error(e); }
+    PopChatsDB.markOnline(true).catch(e => console.error(e));
     applyTheme(localStorage.getItem(THEME_STORAGE_KEY) || (me && me.theme) || 'lavender', false);
     showScreen('chats', 'chats');
-    await loadChatList();
+    loadChatList().catch(e => console.error('loadChatList:', e));
     refreshProfileScreen();
-    // First-time login: prompt for full profile
     if (me && !me.onboarded) openOnboardingModal(user);
   } catch (e) {
     console.error('bootAuthed error', e);
