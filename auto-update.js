@@ -26,7 +26,7 @@
     prompt.innerHTML = `
       <div class="upp-card">
         <div class="upp-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
             <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
             <polyline points="21 3 21 8 16 8"/>
           </svg>
@@ -84,7 +84,7 @@
     updateBanner.className = 'update-banner';
     updateBanner.innerHTML = `
       <div class="ub-content">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
           <polyline points="21 3 21 8 16 8"/>
         </svg>
