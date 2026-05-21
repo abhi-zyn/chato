@@ -26,10 +26,10 @@
     inset: 0;
     max-width: none;
     margin: 0;
-    padding-left: 344px;     /* 64 rail + 280 panel */
+    padding-left: 396px;     /* 16 left + 60 rail + 14 gap + 290 panel + 16 right gap */
     transition: padding-left 0.25s ease;
   }
-  body.sb-collapsed .app { padding-left: 64px; }
+  body.sb-collapsed .app { padding-left: 92px; }
   body.sb-collapsed .sb-panel {
     transform: translateX(-100%);
     pointer-events: none;
@@ -41,37 +41,39 @@
   .desktop-sidebar {
     display: flex;
     position: fixed;
-    top: 12px;
-    left: 12px;
-    bottom: 12px;
+    top: 16px;
+    left: 16px;
+    bottom: 16px;
     z-index: 50;
     font-family: 'Geist', sans-serif;
-    gap: 12px;
+    gap: 14px;
   }
   .sb-ambient { display: none; }
 
   /* ============================================================
-     ICON RAIL — narrow, dark glass with traffic lights at top
+     ICON RAIL
      ============================================================ */
   .sb-rail {
-    width: 64px;
-    background: rgba(15, 12, 14, 0.55);
-    backdrop-filter: blur(28px) saturate(160%);
-    -webkit-backdrop-filter: blur(28px) saturate(160%);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 22px;
+    position: relative;
+    width: 60px;
+    background: rgba(15, 12, 14, 0.6);
+    backdrop-filter: blur(28px) saturate(170%);
+    -webkit-backdrop-filter: blur(28px) saturate(170%);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 26px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 12px 0 10px;
+    padding: 14px 0 14px;
     box-shadow:
-      0 24px 60px rgba(0, 0, 0, 0.35),
-      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      0 24px 60px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    overflow: visible;
   }
   .sb-traffic {
     display: flex;
     gap: 6px;
-    padding: 4px 0 14px;
+    padding: 4px 0 16px;
   }
   .tl {
     width: 10px; height: 10px; border-radius: 50%;
@@ -83,14 +85,16 @@
 
   .sb-brand-square {
     width: 32px; height: 32px;
-    background: white;
+    background: linear-gradient(180deg, #ffffff 0%, #f0eae0 100%);
     color: #1a1a18;
-    border-radius: 8px;
+    border-radius: 9px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 14px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    margin-bottom: 18px;
+    box-shadow:
+      0 6px 14px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
   }
   .sb-brand-square svg { width: 18px; height: 18px; }
 
@@ -98,18 +102,15 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     width: 100%;
     flex: 1;
   }
-  .sb-rail-spacer {
-    flex: 1;
-    min-height: 12px;
-  }
+  .sb-rail-spacer { flex: 1; min-height: 14px; }
 
-  /* Rail icon button — with left active-bar indicator */
+  /* Rail icon button — with left active-bar indicator at the rail's edge */
   .sb-icon-btn {
-    width: 40px; height: 40px;
+    width: 38px; height: 38px;
     border-radius: 11px;
     border: 1px solid transparent;
     background: transparent;
@@ -122,90 +123,100 @@
     position: relative;
   }
   .sb-icon-btn::before {
-    /* left active-bar indicator (matches reference) */
+    /* left active-bar — sits at the LEFT EDGE OF THE RAIL */
     content: '';
     position: absolute;
-    left: -14px;
+    left: -12px;     /* rail edge sits here (icon centered in 60px rail with ~11px margin) */
     top: 50%;
     transform: translateY(-50%) scaleY(0);
-    width: 3px;
-    height: 22px;
-    border-radius: 0 3px 3px 0;
-    background: linear-gradient(180deg, #f4713a, #f4a876);
-    box-shadow: 0 0 8px rgba(244, 113, 58, 0.6);
-    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    width: 4px;
+    height: 26px;
+    border-radius: 0 4px 4px 0;
+    background: linear-gradient(180deg, #f4713a 0%, #ff8e5b 100%);
+    box-shadow: 0 0 10px rgba(244, 113, 58, 0.7);
+    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
   .sb-icon-btn.active::before { transform: translateY(-50%) scaleY(1); }
   .sb-icon-btn:hover {
     background: rgba(255, 255, 255, 0.07);
-    color: rgba(255, 255, 255, 0.92);
+    color: rgba(255, 255, 255, 0.95);
   }
   .sb-icon-btn.active {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.13);
     color: white;
   }
   .sb-icon-btn svg { width: 18px; height: 18px; }
   .sb-rail-logout { color: rgba(255, 130, 130, 0.7); }
   .sb-rail-logout:hover { color: #ff8585; background: rgba(255, 90, 90, 0.12); }
-  .sb-rail-logout::before { background: linear-gradient(180deg, #ff5f57, #ff8585); box-shadow: 0 0 8px rgba(255, 90, 90, 0.5); }
+  .sb-rail-logout::before {
+    background: linear-gradient(180deg, #ff5f57, #ff8585);
+    box-shadow: 0 0 10px rgba(255, 90, 90, 0.6);
+  }
 
   /* Bottom avatar on rail */
   .sb-rail-avatar {
     width: 40px; height: 40px;
     border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, 0.18);
-    padding: 0;
-    background: transparent;
+    border: none;
+    padding: 2px;
+    background: linear-gradient(135deg, #f4713a 0%, #c14abf 50%, #6c5ce7 100%);
     cursor: pointer;
     overflow: hidden;
-    margin-top: 8px;
+    margin-top: 12px;
     transition: all 0.2s;
     flex-shrink: 0;
+    box-shadow: 0 4px 14px rgba(244, 113, 58, 0.35);
   }
-  .sb-rail-avatar:hover { border-color: rgba(244, 113, 58, 0.7); transform: scale(1.06); }
-  .sb-rail-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .sb-rail-avatar:hover { transform: scale(1.08); box-shadow: 0 8px 22px rgba(244, 113, 58, 0.5); }
+  .sb-rail-avatar img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: 50%;
+    border: 2px solid #1a1a18;
+  }
 
   /* ============================================================
-     EXPANDED PANEL — wider glass card with "MENU" sections
+     EXPANDED PANEL
      ============================================================ */
   .sb-panel {
-    width: 280px;
-    background: rgba(20, 14, 18, 0.5);
-    backdrop-filter: blur(30px) saturate(170%);
-    -webkit-backdrop-filter: blur(30px) saturate(170%);
+    width: 290px;
+    background: rgba(20, 14, 18, 0.55);
+    backdrop-filter: blur(34px) saturate(180%);
+    -webkit-backdrop-filter: blur(34px) saturate(180%);
     border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 22px;
+    border-radius: 26px;
     display: flex;
     flex-direction: column;
     transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
     color: rgba(255, 255, 255, 0.92);
     box-shadow:
-      0 24px 60px rgba(0, 0, 0, 0.35),
-      inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    padding-top: 8px;
+      0 24px 60px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    padding-top: 4px;
   }
 
   .sb-panel-traffic {
     display: flex;
     gap: 6px;
-    padding: 8px 0 10px 16px;
+    padding: 14px 0 12px 18px;
   }
   .sb-panel-header {
-    padding: 14px 22px 6px;
+    padding: 18px 24px 4px;
   }
   .sb-panel-title {
-    font-size: 26px;
+    font-size: 30px;
     font-weight: 700;
     color: white;
     letter-spacing: -0.02em;
     line-height: 1;
   }
   .sb-panel-section-label {
-    padding: 16px 22px 8px;
+    padding: 22px 24px 10px;
     font-size: 11px;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.4);
-    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.42);
+    letter-spacing: 0.22em;
     text-transform: uppercase;
   }
 
@@ -220,10 +231,10 @@
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 11px 14px;
-    border-radius: 12px;
-    color: rgba(255, 255, 255, 0.62);
-    font-size: 14px;
+    padding: 12px 14px;
+    border-radius: 13px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 14.5px;
     font-weight: 500;
     cursor: pointer;
     text-decoration: none;
@@ -231,12 +242,14 @@
   }
   .sb-item:hover {
     background: rgba(255, 255, 255, 0.05);
-    color: rgba(255, 255, 255, 0.92);
+    color: rgba(255, 255, 255, 0.95);
   }
   .sb-item.active {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.1);
     color: white;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 4px 14px rgba(0, 0, 0, 0.18);
   }
   .sb-item-icon {
     width: 18px; height: 18px;
@@ -248,7 +261,7 @@
   .sb-item-icon svg { width: 17px; height: 17px; }
   .sb-item-label { flex: 1; }
   .sb-item-chev {
-    color: rgba(255, 255, 255, 0.28);
+    color: rgba(255, 255, 255, 0.3);
     font-size: 22px;
     line-height: 0.6;
     font-weight: 300;
@@ -264,44 +277,43 @@
     margin-right: -4px;
   }
 
-  .sb-item-logout {
-    color: rgba(255, 130, 130, 0.75);
-  }
+  .sb-item-logout { color: rgba(255, 130, 130, 0.78); }
   .sb-item-logout:hover { background: rgba(255, 90, 90, 0.1); color: #ff8585; }
 
   .sb-divider {
     height: 1px;
-    background: rgba(255, 255, 255, 0.07);
-    margin: 18px 22px;
+    background: rgba(255, 255, 255, 0.06);
+    margin: 22px 24px;
   }
 
   /* --- Bottom user card --- */
   .sb-user-card {
     margin: auto 12px 14px;
-    padding: 11px 14px;
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.06);
+    padding: 12px 14px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.07);
     border: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
     align-items: center;
-    gap: 11px;
+    gap: 12px;
     cursor: pointer;
     transition: all 0.2s;
   }
   .sb-user-card:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.12);
     transform: translateY(-1px);
   }
   .sb-user-avatar {
-    width: 38px; height: 38px;
+    width: 40px; height: 40px;
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    border: 2px solid rgba(244, 113, 58, 0.6);
+    box-shadow: 0 0 12px rgba(244, 113, 58, 0.3);
   }
   .sb-user-meta { flex: 1; min-width: 0; }
   .sb-user-name {
-    font-size: 13.5px;
+    font-size: 14px;
     font-weight: 600;
     color: white;
     overflow: hidden;
@@ -310,7 +322,7 @@
   }
   .sb-user-tier {
     font-size: 10.5px;
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.45);
     margin-top: 2px;
     letter-spacing: 0.02em;
   }
