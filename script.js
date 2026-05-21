@@ -1926,6 +1926,10 @@ async function bootAuthed(user) {
       PopChatsDB.markOnline(true).catch(() => {});
       startOnlineHeartbeat();
       startPresenceWatcher();
+      // Start listening for inbound WebRTC calls
+      if (window.WebRTCCall && WebRTCCall.startInboundListener) {
+        WebRTCCall.startInboundListener();
+      }
       refreshRequestsBadge().catch(() => {});
       if (friendActivitySub) { PopChatsDB.unsubscribe(friendActivitySub); friendActivitySub = null; }
       if (me && me.id) {
@@ -1988,6 +1992,10 @@ function bootUnauthed() {
   if (messagePoller) { messagePoller.cancel(); messagePoller = null; }
   stopOnlineHeartbeat();
   stopPresenceWatcher();
+  if (window.WebRTCCall && WebRTCCall.stopInboundListener) {
+    WebRTCCall.stopInboundListener();
+    if (WebRTCCall.isInCall()) WebRTCCall.endCall();
+  }
   setRequestsBadge(0);
   showScreen('login');
 }
