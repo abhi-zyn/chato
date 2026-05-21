@@ -2271,8 +2271,22 @@ function bootUnauthed() {
     if (event === 'INITIAL_SESSION') return; // handled explicitly below
     // Skip SIGNED_IN during OAuth flow — wait until explicit boot completes
     if (hadOAuthCode && !oauthFlowComplete && event === 'SIGNED_IN') return;
-    if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-      if (session) await bootAuthed(session.user); else bootUnauthed();
+    if (event === 'TOKEN_REFRESHED') {
+      // Just refresh internal token reference — DON'T reboot the UI or it will
+      // reset the open chat / current screen.
+      try {
+        const c = window.sb;
+        if (c && c.realtime && c.realtime.setAuth && session) {
+          c.realtime.setAuth(session.access_token);
+        }
+      } catch (_) {}
+      return;
+    }
+    if (event === 'SIGNED_IN') {
+      // Only re-boot if we don't already have a user (e.g., manual sign-in)
+      if (session && (!me || me.id !== session.user.id)) {
+        await bootAuthed(session.user);
+      }
     } else if (event === 'SIGNED_OUT') {
       bootUnauthed();
     }
