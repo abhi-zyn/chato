@@ -210,8 +210,8 @@ begin
     from public.chats c
    where c.is_stranger = false
      and (select count(*) from public.chat_members cm where cm.chat_id = c.id) = 2
-     and exists (select 1 from public.chat_members where chat_id = c.id and user_id = a)
-     and exists (select 1 from public.chat_members where chat_id = c.id and user_id = b)
+     and exists (select 1 from public.chat_members cm where cm.chat_id = c.id and cm.user_id = a)
+     and exists (select 1 from public.chat_members cm where cm.chat_id = c.id and cm.user_id = b)
    limit 1;
   if existing is not null then return existing; end if;
 
@@ -233,7 +233,7 @@ declare
   me uuid := auth.uid();
   lo uuid; hi uuid;
   r  public.friendships%rowtype;
-  chat_id uuid;
+  v_chat_id uuid;
 begin
   if me is null then raise exception 'not authenticated'; end if;
   if other = me then raise exception 'cannot accept self'; end if;
@@ -253,13 +253,13 @@ begin
      set status = 'accepted', updated_at = now()
    where user_low = lo and user_high = hi;
 
-  chat_id := public._ensure_dm(me, other);
+  v_chat_id := public._ensure_dm(me, other);
 
   insert into public.notifications (user_id, kind, payload)
   values (r.requested_by, 'friend_accepted',
-          jsonb_build_object('from', me, 'chat_id', chat_id));
+          jsonb_build_object('from', me, 'chat_id', v_chat_id));
 
-  return chat_id;
+  return v_chat_id;
 end;
 $$;
 
@@ -442,8 +442,8 @@ begin
     from public.chats c
    where c.is_stranger = false
      and (select count(*) from public.chat_members cm where cm.chat_id = c.id) = 2
-     and exists (select 1 from public.chat_members where chat_id = c.id and user_id = me)
-     and exists (select 1 from public.chat_members where chat_id = c.id and user_id = other_user_id)
+     and exists (select 1 from public.chat_members cm where cm.chat_id = c.id and cm.user_id = me)
+     and exists (select 1 from public.chat_members cm where cm.chat_id = c.id and cm.user_id = other_user_id)
    limit 1;
   if existing_chat is not null then return existing_chat; end if;
 
