@@ -440,6 +440,33 @@ window.PopChatsDB = (function () {
     return ch;
   }
 
+  // GLOBAL message subscription — listens to all messages across the user's chats.
+  // Used for unread counters and surfacing notifications even when a chat isn't open.
+  function subscribeToAllMyMessages(onMessage) {
+    // We can't filter by chat_id list in postgres_changes, so we subscribe to ALL
+    // messages and filter client-side using the chat IDs we know about.
+    const ch = client()
+      .channel('my-messages')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        async (payload) => {
+          const row = payload.new;
+          if (!row) return;
+          // Decrypt if needed
+          if (row.text_enc) {
+            try {
+              const plain = await decryptMessage(row.id);
+              row.text = plain || row.text || '';
+            } catch (e) {}
+          }
+          onMessage(row);
+        }
+      )
+      .subscribe();
+    return ch;
+  }
+
   function unsubscribe(ch) {
     if (ch) client().removeChannel(ch);
   }
@@ -472,7 +499,7 @@ window.PopChatsDB = (function () {
     subscribeToFriendActivity,
     listMyChats, getChatMembers,
     getOrCreateDM, startStrangerChat, pickRandomStranger,
-    listMessages, sendMessage, subscribeToChat, unsubscribe,
+    listMessages, sendMessage, subscribeToChat, subscribeToAllMyMessages, unsubscribe,
     decryptMessage, lastMessagePreview,
     listNotifications, listCalls
   };

@@ -647,3 +647,23 @@ html,body { height:100%; width:100%; overflow:hidden; overscroll-behavior:none; 
   .upp-card{border-radius:24px;max-width:380px;transform:scale(0.9) translateY(20px)}
   .update-permission-prompt.show .upp-card{transform:scale(1) translateY(0)}
 }
+
+/* Unread message badge on chat card */
+.unread-badge{
+  min-width:22px;height:22px;padding:0 7px;border-radius:11px;
+  background:linear-gradient(135deg,#ff3b30,#ff5e57);
+  color:#fff;font-size:11px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 2px 8px rgba(255,59,48,0.35),inset 0 1px 0 rgba(255,255,255,0.4);
+  animation:unreadPop 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes unreadPop{
+  0%{transform:scale(0)}
+  100%{transform:scale(1)}
+}
+.chat-card.has-unread .chat-name{font-weight:700}
+.chat-card.has-unread .chat-sub{color:#1a1a1a;font-weight:500}
+.chat-card.has-unread{
+  background:rgba(255,255,255,0.12);
+  border-color:rgba(255,255,255,0.32);
+}

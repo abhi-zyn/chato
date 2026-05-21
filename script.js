@@ -25,9 +25,44 @@ const chatList = document.getElementById('chatList');
 let me = null;          // current profile row from public.profiles
 let activeChat = null;  // { id, other }
 let messageSub = null;  // realtime channel for active chat
+let allMessagesSub = null; // global realtime channel for ALL my chats
 let friendActivitySub = null;  // realtime channel for friend requests
 let pendingRequestCount = 0;   // incoming pending requests, for badge
 let activeRequestTab = 'incoming';
+
+// Unread counts per chat (persisted in localStorage)
+const _unread = {
+  get map() {
+    if (this._m !== undefined) return this._m;
+    try {
+      const raw = localStorage.getItem('popchats.unread');
+      this._m = raw ? JSON.parse(raw) : {};
+    } catch (_) { this._m = {}; }
+    return this._m;
+  },
+  save() {
+    try {
+      localStorage.setItem('popchats.unread', JSON.stringify(this._m || {}));
+    } catch (_) {}
+  },
+  get(chatId) { return (this.map[chatId] || 0); },
+  inc(chatId) {
+    this._m = this.map;
+    this._m[chatId] = (this._m[chatId] || 0) + 1;
+    this.save();
+  },
+  clear(chatId) {
+    this._m = this.map;
+    if (this._m[chatId]) {
+      delete this._m[chatId];
+      this.save();
+    }
+  },
+  total() {
+    const m = this.map;
+    return Object.values(m).reduce((a, b) => a + b, 0);
+  }
+};
 
 // ---------- helpers ----------
 const AVATAR_FALLBACK = 'https://api.dicebear.com/7.x/initials/svg?seed=';
@@ -226,18 +261,113 @@ function renderChatListDOM(chats) {
     const name = escapeHtml(other ? (other.full_name || other.display_name || other.username) : 'Unknown');
     const sub  = escapeHtml(c.last_text || (c.is_stranger ? 'Stranger chat' : 'Say hi'));
     const dot  = other && other.online ? '<div class="online"></div>' : '';
+    const unreadCount = _unread.get(c.id);
+    const unreadBadge = unreadCount > 0
+      ? `<div class="unread-badge">${unreadCount > 99 ? '99+' : unreadCount}</div>`
+      : '';
     card.innerHTML =
       `<div class="avatar"><img src="${avatarOf(other)}" alt=""/></div>` +
       `<div class="chat-info">` +
         `<div class="chat-name">${name}</div>` +
         `<div class="chat-sub">${sub}</div>` +
       `</div>` +
-      `<div class="chat-meta">${dot}</div>`;
+      `<div class="chat-meta">${unreadBadge}${dot}</div>`;
+    if (unreadCount > 0) card.classList.add('has-unread');
     // Store data on the card for delegation
     card._chatData = { id: c.id, other, isStranger: c.is_stranger };
     chatList.appendChild(card);
     setTimeout(() => card.classList.add('show'), i * 60);
   });
+  updateGlobalUnreadBadge();
+}
+
+// Update unread badge for a specific chat card (no full re-render)
+function updateChatCardUnread(chatId) {
+  if (!chatList) return;
+  const card = chatList.querySelector(`.chat-card[data-id="${chatId}"]`);
+  if (!card) return;
+  const meta = card.querySelector('.chat-meta');
+  if (!meta) return;
+  const dot = meta.querySelector('.online');
+  const dotHtml = dot ? dot.outerHTML : '';
+  const count = _unread.get(chatId);
+  const badge = count > 0
+    ? `<div class="unread-badge">${count > 99 ? '99+' : count}</div>`
+    : '';
+  meta.innerHTML = badge + dotHtml;
+  card.classList.toggle('has-unread', count > 0);
+}
+
+function updateGlobalUnreadBadge() {
+  // Update any global unread counter in nav/header here if needed
+  const total = _unread.total();
+  document.title = total > 0 ? `(${total}) PopChats` : 'PopChats';
+}
+
+// Handle incoming message from global realtime subscription
+function handleIncomingMessage(msg) {
+  if (!msg || !msg.chat_id || !msg.sender_id) return;
+  // Ignore my own messages (already handled by send flow)
+  if (me && msg.sender_id === me.id) return;
+
+  // Update last message in cached chat list for instant preview
+  if (_cache.chats) {
+    const chat = _cache.chats.find(c => c.id === msg.chat_id);
+    if (chat) {
+      chat.last_text = msg.text || '';
+      chat.last_at = msg.created_at;
+    }
+  }
+
+  // If this chat is currently open, append message directly (no unread bump)
+  if (activeChat && activeChat.id === msg.chat_id) {
+    appendMessage(msg);
+    return;
+  }
+
+  // Bump unread counter
+  _unread.inc(msg.chat_id);
+  updateChatCardUnread(msg.chat_id);
+  updateGlobalUnreadBadge();
+
+  // Move this chat to the top of the cached list and re-render
+  if (_cache.chats) {
+    const idx = _cache.chats.findIndex(c => c.id === msg.chat_id);
+    if (idx > 0) {
+      const [chat] = _cache.chats.splice(idx, 1);
+      _cache.chats.unshift(chat);
+      _cache.chats = _cache.chats; // trigger setter to persist
+      renderChatListDOM(_cache.chats);
+    }
+  }
+
+  // Subtle ping sound (optional, only if permitted)
+  playMessagePing();
+}
+
+// Subtle audio ping for new messages
+let _pingAudio = null;
+function playMessagePing() {
+  try {
+    if (!_pingAudio) {
+      // Encode a short tone using Web Audio
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      _pingAudio = ctx;
+    }
+    const ctx = _pingAudio;
+    if (ctx.state === 'suspended') ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.3);
+  } catch (_) {}
 }
 
 // Event delegation for chat card clicks (more robust than per-card handlers)
@@ -279,6 +409,12 @@ async function openChat(chatId, otherProfile, isStranger) {
     other = members.find(m => m.id !== (me && me.id)) || null;
   }
   activeChat = { id: chatId, other, isStranger: !!isStranger, friendState: 'none' };
+  
+  // Clear unread count for this chat
+  _unread.clear(chatId);
+  updateChatCardUnread(chatId);
+  updateGlobalUnreadBadge();
+  
   convAv.src = avatarOf(other);
   convAv.alt = other ? (other.full_name || other.display_name || other.username) : '';
   convNm.textContent = other ? (other.full_name || other.display_name || other.username) : 'Unknown';
@@ -1673,6 +1809,15 @@ async function bootAuthed(user) {
           }
         });
       }
+
+      // GLOBAL realtime subscription — listens for messages on ALL my chats
+      // Updates unread counters and shows toast notifications for non-active chats
+      if (allMessagesSub) { PopChatsDB.unsubscribe(allMessagesSub); allMessagesSub = null; }
+      if (me && me.id) {
+        allMessagesSub = PopChatsDB.subscribeToAllMyMessages((msg) => {
+          handleIncomingMessage(msg);
+        });
+      }
       if (me && !me.onboarded) openOnboardingModal(user);
       // PWA install prompt: first login + every 5 days
       maybeShowInstallPrompt();
@@ -1705,6 +1850,7 @@ function bootUnauthed() {
   _cache.messages = {};
   if (messageSub) { PopChatsDB.unsubscribe(messageSub); messageSub = null; }
   if (friendActivitySub) { PopChatsDB.unsubscribe(friendActivitySub); friendActivitySub = null; }
+  if (allMessagesSub) { PopChatsDB.unsubscribe(allMessagesSub); allMessagesSub = null; }
   setRequestsBadge(0);
   showScreen('login');
 }
