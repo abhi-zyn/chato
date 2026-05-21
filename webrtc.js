@@ -155,6 +155,11 @@ window.WebRTCCall = (function () {
       // Show outgoing UI immediately so user knows something happened
       showCallUI('outgoing');
 
+      // Clean up any stale signaling rows for this room (from previous call sessions)
+      try {
+        await window.sb.from('signaling').delete().eq('room_id', roomId);
+      } catch (e) { console.warn('[startCall] cleanup failed', e); }
+
       // Request media permissions
       try {
         localStream = await getMedia(video);
@@ -176,49 +181,13 @@ window.WebRTCCall = (function () {
       // Listen for signals before sending offer
       listenSignals(roomId, handleSignal);
 
-      // Check if there's already an offer for this room (we're the second peer)
-      let existing = null;
-      try {
-        const res = await window.sb
-          .from('signaling')
-          .select('*')
-          .eq('room_id', roomId)
-          .eq('type', 'offer')
-          .order('created_at', { ascending: false })
-          .limit(1);
-        existing = res.data;
-        if (res.error) {
-          // Likely the migration hasn't been run yet
-          const status = document.getElementById('callStatus');
-          if (status) status.textContent = 'Signaling not configured. Run migrations/009_signaling.sql in Supabase.';
-          console.error('[startCall] signaling query failed:', res.error);
-          setTimeout(() => endCall(), 4000);
-          return false;
-        }
-      } catch (e) {
-        const status = document.getElementById('callStatus');
-        if (status) status.textContent = 'Cannot reach signaling server.';
-        console.error('[startCall]', e);
-        setTimeout(() => endCall(), 3000);
-        return false;
-      }
-
-      if (existing && existing.length && existing[0].sender_id !== SENDER_ID) {
-        // Second peer flow — answer the existing offer
-        const offerRow = existing[0];
-        await pc.setRemoteDescription(offerRow.payload.offer);
-        await flushPendingIce();
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        await sendSignal(roomId, 'answer', { answer });
-        showCallUI('active');
-      } else {
-        // First peer flow — create offer
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        await sendSignal(roomId, 'offer', { offer, video });
-        // UI already showing outgoing
-      }
+      // Always treat startCall as the offerer (caller initiates the call)
+      // The previous "check for existing offer" logic caused stale-offer bugs:
+      // a leftover offer from a crashed session would make us answer ourselves.
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await sendSignal(roomId, 'offer', { offer, video });
+      // UI stays at 'outgoing' until callee answers (handleSignal('answer'))
       return true;
     } catch (e) {
       console.error('[startCall]', e);
@@ -334,6 +303,8 @@ window.WebRTCCall = (function () {
         if (!pc || !pc.localDescription) return;
         await pc.setRemoteDescription(payload.answer);
         await flushPendingIce();
+        // Now connected — switch UI from outgoing to active
+        showCallUI('active');
       } else if (type === 'ice-candidate') {
         if (!pc) return;
         if (pc.remoteDescription) {
@@ -410,6 +381,9 @@ window.WebRTCCall = (function () {
   }
 
   function startCallTimer() {
+    if (currentCall && currentCall._timerStarted) return; // don't double-start
+    if (currentCall) currentCall._timerStarted = true;
+    if (currentCall) currentCall.startTime = Date.now(); // reset to NOW (ignore time spent waiting)
     const status = document.getElementById('callStatus');
     if (!status) return;
     const interval = setInterval(() => {
