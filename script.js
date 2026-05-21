@@ -1368,7 +1368,7 @@ async function bootAuthed(user) {
       } catch (e) { console.error('profile init failed', e); }
     }
     PopChatsDB.markOnline(true).catch(e => console.error(e));
-    applyTheme(localStorage.getItem(THEME_STORAGE_KEY) || (me && me.theme) || 'lavender', false);
+    applyTheme(localStorage.getItem(THEME_STORAGE_KEY) || (me && me.theme) || 'ocean', false);
     showScreen('chats', 'chats');
     loadChatList().catch(e => console.error('loadChatList:', e));
     refreshProfileScreen();

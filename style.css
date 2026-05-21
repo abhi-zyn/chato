@@ -1,11 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-html,body { height:100%; width:100%; overflow:hidden; overscroll-behavior:none; font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; background:linear-gradient(135deg,#f3e7ff 0%,#ffeef8 50%,#e8e0ff 100%); color:#1a1a1a; transition:background 0.6s ease; }
+html,body { height:100%; width:100%; overflow:hidden; overscroll-behavior:none; font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; background:linear-gradient(135deg,#e0f7fa 0%,#b2ebf2 50%,#80deea 100%); color:#1a1a1a; transition:background 0.6s ease; }
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.12);border-radius:100px}::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,0.22)}
 .orb{position:fixed;border-radius:50%;filter:blur(80px);opacity:0.6;pointer-events:none;z-index:0;transition:background 0.6s ease}
-.orb-1{width:300px;height:300px;background:rgba(212,196,251,0.8);top:-50px;right:-80px;animation:float 20s ease-in-out infinite}
-.orb-2{width:250px;height:250px;background:rgba(248,205,218,0.7);bottom:120px;left:-60px;animation:float 25s ease-in-out infinite reverse}
-.orb-3{width:200px;height:200px;background:rgba(224,195,252,0.6);top:40%;left:60%;animation:float 22s ease-in-out infinite;animation-delay:-7s}
+.orb-1{width:300px;height:300px;background:rgba(128,222,234,0.8);top:-50px;right:-80px;animation:float 20s ease-in-out infinite}
+.orb-2{width:250px;height:250px;background:rgba(178,235,242,0.7);bottom:120px;left:-60px;animation:float 25s ease-in-out infinite reverse}
+.orb-3{width:200px;height:200px;background:rgba(224,247,250,0.6);top:40%;left:60%;animation:float 22s ease-in-out infinite;animation-delay:-7s}
 @keyframes float{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(25px,-25px) scale(1.08)}}
 .noise{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:0.025;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 .app{position:fixed;inset:0;z-index:2;max-width:430px;margin:0 auto}

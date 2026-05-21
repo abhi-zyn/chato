@@ -13,7 +13,7 @@ create table if not exists public.profiles (
   username      text unique not null,
   display_name  text,
   avatar_url    text,
-  theme         text default 'lavender',
+  theme         text default 'ocean',
   online        boolean default false,
   last_seen     timestamptz default now(),
   created_at    timestamptz default now()
