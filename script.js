@@ -1885,26 +1885,29 @@ function bootUnauthed() {
 
   // Auth state
   const hadOAuthCode = !!(new URLSearchParams(window.location.search).get('code'));
+
+  // Clean OAuth code from URL IMMEDIATELY so it doesn't interfere with subsequent API calls
+  if (hadOAuthCode) {
+    const u = new URL(window.location.href);
+    u.searchParams.delete('code');
+    u.searchParams.delete('state');
+    window.history.replaceState({}, document.title, u.pathname + u.search + u.hash);
+  }
+
   PopChatsAuth.onAuthChange(async (event, session) => {
     if (event === 'INITIAL_SESSION') {
-      // On OAuth callback, Supabase auto-exchanges the code and fires INITIAL_SESSION
-      // with the new session. We must handle it here.
       if (session) {
         clearTimeout(splashWatchdog);
-        // Clean URL
-        const u = new URL(window.location.href);
-        u.searchParams.delete('code');
-        u.searchParams.delete('state');
-        window.history.replaceState({}, document.title, u.pathname + u.search + u.hash);
         await bootAuthed(session.user);
         hideOAuthSplash();
       } else if (!hadOAuthCode) {
-        // Normal load with no session — show login
         bootUnauthed();
         hideOAuthSplash();
       }
       return;
     }
+    // Skip SIGNED_IN during OAuth flow — INITIAL_SESSION handles it
+    if (hadOAuthCode && event === 'SIGNED_IN') return;
     if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
       if (session) await bootAuthed(session.user); else bootUnauthed();
     } else if (event === 'SIGNED_OUT') {
