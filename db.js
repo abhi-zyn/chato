@@ -198,11 +198,22 @@ window.PopChatsDB = (function () {
     const profileMap = Object.fromEntries(profiles.map(p => [p.id, p]));
 
     const { data: msgs } = await client()
-      .from('messages').select('chat_id,text,created_at')
+      .from('messages').select('chat_id,text,text_enc,created_at')
       .in('chat_id', chatIds)
       .order('created_at', { ascending: false });
     const lastMsg = {};
     (msgs || []).forEach(m => { if (!lastMsg[m.chat_id]) lastMsg[m.chat_id] = m; });
+
+    // Decrypt previews for any encrypted last-messages (in parallel)
+    const encChatIds = Object.entries(lastMsg)
+      .filter(([, m]) => m && m.text_enc)
+      .map(([cid]) => cid);
+    if (encChatIds.length) {
+      await Promise.all(encChatIds.map(async (cid) => {
+        const preview = await lastMessagePreview(cid);
+        if (preview) lastMsg[cid] = { ...lastMsg[cid], text: preview.text };
+      }));
+    }
 
     return chats.map(c => {
       const others = (allMembers || [])
@@ -269,21 +280,32 @@ window.PopChatsDB = (function () {
 
   // ---------- messages ----------
   async function listMessages(chatId) {
-    const { data, error } = await client().from('messages')
-      .select('*').eq('chat_id', chatId)
-      .order('created_at', { ascending: true })
-      .limit(200);
+    const { data, error } = await client().rpc('list_messages_decrypted', { _chat_id: chatId });
     if (error) { console.error('[listMessages]', error); return []; }
     return data || [];
   }
 
   async function sendMessage(chatId, text) {
     const id = await uid(); if (!id) throw new Error('Not signed in');
-    const { data, error } = await client().from('messages')
-      .insert({ chat_id: chatId, sender_id: id, text })
-      .select().single();
+    const { data, error } = await client().rpc('send_message_encrypted',
+      { _chat_id: chatId, _text: text });
     if (error) throw error;
+    // RPC returns a row set; take the single row.
+    if (Array.isArray(data) && data.length) return data[0];
     return data;
+  }
+
+  async function decryptMessage(id) {
+    const { data, error } = await client().rpc('decrypt_message_text', { _id: id });
+    if (error) { console.error('[decryptMessage]', error); return null; }
+    return data;
+  }
+
+  async function lastMessagePreview(chatId) {
+    const { data, error } = await client().rpc('last_message_preview', { _chat_id: chatId });
+    if (error) { console.error('[lastMessagePreview]', error); return null; }
+    if (Array.isArray(data) && data.length) return data[0];
+    return null;
   }
 
   function subscribeToChat(chatId, onMessage) {
@@ -292,7 +314,17 @@ window.PopChatsDB = (function () {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: 'chat_id=eq.' + chatId },
-        (payload) => { onMessage(payload.new); }
+        async (payload) => {
+          const row = payload.new;
+          // If encrypted, fetch decrypted text via RPC; otherwise pass through
+          if (row && row.text_enc) {
+            try {
+              const plain = await decryptMessage(row.id);
+              row.text = plain || row.text || '';
+            } catch (e) { console.error('decrypt realtime', e); }
+          }
+          onMessage(row);
+        }
       )
       .subscribe();
     return ch;
@@ -331,6 +363,7 @@ window.PopChatsDB = (function () {
     listMyChats, getChatMembers,
     getOrCreateDM, startStrangerChat, pickRandomStranger,
     listMessages, sendMessage, subscribeToChat, unsubscribe,
+    decryptMessage, lastMessagePreview,
     listNotifications, listCalls
   };
 })();
