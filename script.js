@@ -1347,6 +1347,92 @@ function closeFriendSheet() {
 // ---------- Boot / auth gate ----------
 let bootingAuthed = false; // false | Promise<void> while a boot is in flight
 
+// ---------- PWA install prompt ----------
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+});
+
+function maybeShowInstallPrompt() {
+  // Already installed as standalone — skip
+  if (window.matchMedia('(display-mode: standalone)').matches) return;
+  if (navigator.standalone) return; // iOS
+
+  const KEY = 'popchats.installPromptAt';
+  const last = localStorage.getItem(KEY);
+  const now = Date.now();
+  const FIVE_DAYS = 5 * 24 * 60 * 60 * 1000;
+
+  // Show on first login (no key) or if 5+ days since last prompt
+  if (last && (now - Number(last)) < FIVE_DAYS) return;
+
+  // Delay slightly so it doesn't compete with onboarding modal
+  setTimeout(() => {
+    // If native prompt is available, use it
+    if (deferredInstallPrompt) {
+      showInstallBanner(() => {
+        deferredInstallPrompt.prompt();
+        deferredInstallPrompt.userChoice.then(() => { deferredInstallPrompt = null; });
+        localStorage.setItem(KEY, String(Date.now()));
+      });
+    } else {
+      // Fallback: show a manual instruction banner
+      showInstallBanner(null);
+      localStorage.setItem(KEY, String(Date.now()));
+    }
+  }, 2000);
+}
+
+function showInstallBanner(onInstall) {
+  // Don't show if onboarding modal is open
+  if (document.getElementById('onboardModal') &&
+      document.getElementById('onboardModal').classList.contains('open')) {
+    setTimeout(() => showInstallBanner(onInstall), 3000);
+    return;
+  }
+  const existing = document.getElementById('installBanner');
+  if (existing) existing.remove();
+
+  const banner = document.createElement('div');
+  banner.id = 'installBanner';
+  banner.innerHTML = `
+    <div class="install-banner-content">
+      <img src="icon.svg" alt="" class="install-banner-icon"/>
+      <div class="install-banner-text">
+        <strong>Install PopChats</strong>
+        <span>Add to your home screen for the best experience</span>
+      </div>
+      <div class="install-banner-actions">
+        ${onInstall ? '<button class="install-btn-yes" type="button">Install</button>' : ''}
+        <button class="install-btn-no" type="button">Not now</button>
+      </div>
+    </div>`;
+  document.body.appendChild(banner);
+  requestAnimationFrame(() => banner.classList.add('show'));
+
+  banner.querySelector('.install-btn-no').addEventListener('click', () => {
+    banner.classList.remove('show');
+    setTimeout(() => banner.remove(), 300);
+    localStorage.setItem('popchats.installPromptAt', String(Date.now()));
+  });
+  const yesBtn = banner.querySelector('.install-btn-yes');
+  if (yesBtn && onInstall) {
+    yesBtn.addEventListener('click', () => {
+      onInstall();
+      banner.classList.remove('show');
+      setTimeout(() => banner.remove(), 300);
+    });
+  }
+  // Auto-dismiss after 15s
+  setTimeout(() => {
+    if (banner.parentNode) {
+      banner.classList.remove('show');
+      setTimeout(() => banner.remove(), 300);
+    }
+  }, 15000);
+}
+
 function withTimeout(promise, ms, label) {
   return Promise.race([
     promise,
@@ -1405,6 +1491,8 @@ async function bootAuthed(user) {
         });
       }
       if (me && !me.onboarded) openOnboardingModal(user);
+      // PWA install prompt: first login + every 5 days
+      maybeShowInstallPrompt();
     } catch (e) {
       console.error('bootAuthed error', e);
       showScreen('chats', 'chats');

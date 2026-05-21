@@ -556,3 +556,40 @@ html,body { height:100%; width:100%; overflow:hidden; overscroll-behavior:none; 
 /* Requests screen header (back-btn + h1 left-aligned) */
 #screenRequests .header{justify-content:flex-start;gap:8px}
 #screenRequests .header h1{font-size:22px;font-weight:700;letter-spacing:-0.4px}
+
+/* ----- PWA Install Banner ----- */
+#installBanner{
+  position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);
+  z-index:9998;opacity:0;pointer-events:none;
+  transition:opacity .3s ease, transform .3s ease;
+  width:calc(100% - 32px);max-width:400px;
+}
+#installBanner.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+.install-banner-content{
+  display:flex;align-items:center;gap:12px;
+  padding:14px 16px;border-radius:20px;
+  background:rgba(255,255,255,0.18);
+  border:1px solid rgba(255,255,255,0.25);
+  backdrop-filter:blur(32px) saturate(160%);
+  -webkit-backdrop-filter:blur(32px) saturate(160%);
+  box-shadow:0 8px 32px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.3);
+}
+.install-banner-icon{width:40px;height:40px;border-radius:10px;flex-shrink:0}
+.install-banner-text{flex:1;min-width:0;font-size:13px;line-height:1.4;color:#1a1a18}
+.install-banner-text strong{display:block;font-size:14px;font-weight:700}
+.install-banner-text span{color:rgba(26,26,24,0.65)}
+.install-banner-actions{display:flex;gap:6px;flex-shrink:0}
+.install-btn-yes{
+  padding:8px 14px;border-radius:10px;border:none;
+  background:#1a1a18;color:#fff;font-size:12.5px;font-weight:600;
+  cursor:pointer;transition:transform .15s;
+}
+.install-btn-yes:active{transform:scale(0.95)}
+.install-btn-no{
+  padding:8px 12px;border-radius:10px;border:1px solid rgba(0,0,0,0.1);
+  background:transparent;color:rgba(26,26,24,0.6);font-size:12.5px;font-weight:500;
+  cursor:pointer;
+}
+@media(min-width:768px){
+  #installBanner{bottom:24px}
+}
