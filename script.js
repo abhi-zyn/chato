@@ -2290,14 +2290,28 @@ function bootUnauthed() {
   // Call button handlers
   document.getElementById('friendSheetCall')?.addEventListener('click', async () => {
     const friendId = document.getElementById('friendSheetHandle').dataset.userId;
-    if (!friendId) return;
+    if (!friendId) {
+      toast('Cannot start call: user ID missing');
+      return;
+    }
+    if (!window.WebRTCCall) {
+      toast('Calling not available — WebRTC module failed to load');
+      return;
+    }
     closeFriendSheet();
     await WebRTCCall.startCall(friendId, false);
   });
 
   document.getElementById('friendSheetVideo')?.addEventListener('click', async () => {
     const friendId = document.getElementById('friendSheetHandle').dataset.userId;
-    if (!friendId) return;
+    if (!friendId) {
+      toast('Cannot start call: user ID missing');
+      return;
+    }
+    if (!window.WebRTCCall) {
+      toast('Calling not available — WebRTC module failed to load');
+      return;
+    }
     closeFriendSheet();
     await WebRTCCall.startCall(friendId, true);
   });

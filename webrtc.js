@@ -121,12 +121,31 @@ window.WebRTCCall = (function () {
   async function startCall(friendId, video = false) {
     try {
       const myId = window.me && window.me.id;
-      if (!myId) return false;
+      if (!myId) {
+        alert('You must be signed in to start a call.');
+        return false;
+      }
+      if (!friendId) {
+        alert('Cannot start call: friend ID missing.');
+        return false;
+      }
+      
       // Deterministic room ID from sorted user IDs so both sides agree
       const roomId = 'call:' + [myId, friendId].sort().join('_');
       currentCall = { roomId, friendId, video, initiator: true, startTime: Date.now() };
 
-      localStream = await getMedia(video);
+      // Show outgoing UI immediately so user knows something happened
+      showCallUI('outgoing');
+
+      // Request media permissions
+      try {
+        localStream = await getMedia(video);
+      } catch (e) {
+        // getMedia already showed a status message
+        setTimeout(() => endCall(), 2000);
+        return false;
+      }
+      
       const localVideo = document.getElementById('localVideo');
       if (localVideo) {
         localVideo.srcObject = localStream;
@@ -140,13 +159,31 @@ window.WebRTCCall = (function () {
       listenSignals(roomId, handleSignal);
 
       // Check if there's already an offer for this room (we're the second peer)
-      const { data: existing } = await window.sb
-        .from('signaling')
-        .select('*')
-        .eq('room_id', roomId)
-        .eq('type', 'offer')
-        .order('created_at', { ascending: false })
-        .limit(1);
+      let existing = null;
+      try {
+        const res = await window.sb
+          .from('signaling')
+          .select('*')
+          .eq('room_id', roomId)
+          .eq('type', 'offer')
+          .order('created_at', { ascending: false })
+          .limit(1);
+        existing = res.data;
+        if (res.error) {
+          // Likely the migration hasn't been run yet
+          const status = document.getElementById('callStatus');
+          if (status) status.textContent = 'Signaling not configured. Run migrations/009_signaling.sql in Supabase.';
+          console.error('[startCall] signaling query failed:', res.error);
+          setTimeout(() => endCall(), 4000);
+          return false;
+        }
+      } catch (e) {
+        const status = document.getElementById('callStatus');
+        if (status) status.textContent = 'Cannot reach signaling server.';
+        console.error('[startCall]', e);
+        setTimeout(() => endCall(), 3000);
+        return false;
+      }
 
       if (existing && existing.length && existing[0].sender_id !== SENDER_ID) {
         // Second peer flow — answer the existing offer
@@ -162,12 +199,14 @@ window.WebRTCCall = (function () {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         await sendSignal(roomId, 'offer', { offer, video });
-        showCallUI('outgoing');
+        // UI already showing outgoing
       }
       return true;
     } catch (e) {
       console.error('[startCall]', e);
-      endCall();
+      const status = document.getElementById('callStatus');
+      if (status) status.textContent = 'Call failed: ' + (e.message || e.name || 'unknown');
+      setTimeout(() => endCall(), 2000);
       return false;
     }
   }
