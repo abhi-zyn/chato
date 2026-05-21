@@ -451,6 +451,7 @@ window.PopChatsDB = (function () {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
         async (payload) => {
+          console.log('[db] postgres_changes INSERT received:', payload);
           const row = payload.new;
           if (!row) return;
           // Decrypt if needed
@@ -463,7 +464,9 @@ window.PopChatsDB = (function () {
           onMessage(row);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[db] my-messages channel status:', status);
+      });
     return ch;
   }
 

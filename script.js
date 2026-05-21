@@ -306,9 +306,16 @@ function updateGlobalUnreadBadge() {
 
 // Handle incoming message from global realtime subscription
 function handleIncomingMessage(msg) {
-  if (!msg || !msg.chat_id || !msg.sender_id) return;
+  console.log('[realtime] message received:', msg);
+  if (!msg || !msg.chat_id || !msg.sender_id) {
+    console.log('[realtime] missing fields, skipping');
+    return;
+  }
   // Ignore my own messages (already handled by send flow)
-  if (me && msg.sender_id === me.id) return;
+  if (me && msg.sender_id === me.id) {
+    console.log('[realtime] own message, skipping unread bump');
+    return;
+  }
 
   // Update last message in cached chat list for instant preview
   if (_cache.chats) {
@@ -321,12 +328,14 @@ function handleIncomingMessage(msg) {
 
   // If this chat is currently open, append message directly (no unread bump)
   if (activeChat && activeChat.id === msg.chat_id) {
+    console.log('[realtime] chat is active, appending message');
     appendMessage(msg);
     return;
   }
 
   // Bump unread counter
   _unread.inc(msg.chat_id);
+  console.log('[realtime] unread incremented for', msg.chat_id, '→', _unread.get(msg.chat_id));
   updateChatCardUnread(msg.chat_id);
   updateGlobalUnreadBadge();
 
@@ -1814,6 +1823,7 @@ async function bootAuthed(user) {
       // Updates unread counters and shows toast notifications for non-active chats
       if (allMessagesSub) { PopChatsDB.unsubscribe(allMessagesSub); allMessagesSub = null; }
       if (me && me.id) {
+        console.log('[realtime] subscribing to all messages for user', me.id);
         allMessagesSub = PopChatsDB.subscribeToAllMyMessages((msg) => {
           handleIncomingMessage(msg);
         });
