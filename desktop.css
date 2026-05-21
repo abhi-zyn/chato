@@ -420,7 +420,7 @@
   
   /* Animate messages appearing as the chat opens */
   #screenConv.active .messages > * {
-    animation: msgFadeIn 0.4s ease-out backwards;
+    animation: msgFadeIn 0.4s ease-out forwards;
   }
   @keyframes msgFadeIn {
     0% { opacity: 0; transform: translateY(8px); }
