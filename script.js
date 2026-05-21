@@ -1885,29 +1885,12 @@ function bootUnauthed() {
 
   // Auth state
   const hadOAuthCode = !!(new URLSearchParams(window.location.search).get('code'));
+  const hadOAuthError = !!(new URLSearchParams(window.location.search).get('error'));
 
-  // Clean OAuth code from URL IMMEDIATELY so it doesn't interfere with subsequent API calls
-  if (hadOAuthCode) {
-    const u = new URL(window.location.href);
-    u.searchParams.delete('code');
-    u.searchParams.delete('state');
-    window.history.replaceState({}, document.title, u.pathname + u.search + u.hash);
-  }
-
+  // Set up listener for FUTURE auth events (sign-in, sign-out, token refresh)
+  // INITIAL_SESSION is handled below via explicit getSession() to avoid races
   PopChatsAuth.onAuthChange(async (event, session) => {
-    if (event === 'INITIAL_SESSION') {
-      if (session) {
-        clearTimeout(splashWatchdog);
-        await bootAuthed(session.user);
-        hideOAuthSplash();
-      } else if (!hadOAuthCode) {
-        bootUnauthed();
-        hideOAuthSplash();
-      }
-      return;
-    }
-    // Skip SIGNED_IN during OAuth flow — INITIAL_SESSION handles it
-    if (hadOAuthCode && event === 'SIGNED_IN') return;
+    if (event === 'INITIAL_SESSION') return; // handled explicitly below
     if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
       if (session) await bootAuthed(session.user); else bootUnauthed();
     } else if (event === 'SIGNED_OUT') {
@@ -1915,38 +1898,49 @@ function bootUnauthed() {
     }
   });
 
-  // Handle OAuth callback (?code=...) — splash is shown by the inline head script.
-  // Supabase's detectSessionInUrl:true auto-exchanges the code and fires INITIAL_SESSION.
-  // We just need the splash watchdog and error handling.
-  const urlObj = new URL(window.location.href);
-  const oauthCode = urlObj.searchParams.get('code');
-  const oauthError = urlObj.searchParams.get('error') || urlObj.searchParams.get('error_description');
-
-  // Safety: never let splash stick forever, even on a JS error
+  // Handle OAuth callback + normal load via single path
+  // Supabase's detectSessionInUrl:true auto-exchanges the code asynchronously.
+  // Awaiting getSession() implicitly waits for that to complete.
   const splashWatchdog = setTimeout(() => hideOAuthSplash(), 12000);
 
-  if (oauthError) {
+  if (hadOAuthError) {
+    // OAuth error — show splash briefly then fall through to login
     showOAuthSplash(false);
     setTimeout(() => {
       clearTimeout(splashWatchdog);
       hideOAuthSplash();
       toast('Sign-in cancelled or failed.');
-      urlObj.searchParams.delete('error');
-      urlObj.searchParams.delete('error_description');
-      window.history.replaceState({}, document.title, urlObj.pathname);
+      const u = new URL(window.location.href);
+      u.searchParams.delete('error');
+      u.searchParams.delete('error_description');
+      window.history.replaceState({}, document.title, u.pathname);
       bootUnauthed();
     }, 600);
-  } else if (oauthCode) {
-    // Show splash — INITIAL_SESSION handler above will complete the flow
-    showOAuthSplash(true);
   } else {
+    if (hadOAuthCode) showOAuthSplash(true);
+
+    // This await waits for Supabase to finish initializing (incl. OAuth code exchange)
+    let session;
+    try {
+      session = await PopChatsAuth.getSession();
+    } catch (e) {
+      console.error('getSession failed:', e);
+    }
+
+    // Clean URL AFTER Supabase has consumed the code
+    if (hadOAuthCode) {
+      const u = new URL(window.location.href);
+      u.searchParams.delete('code');
+      u.searchParams.delete('state');
+      window.history.replaceState({}, document.title, u.pathname + u.search + u.hash);
+    }
+
     clearTimeout(splashWatchdog);
-    // Normal load (no OAuth) — check for existing session
-    const session = await PopChatsAuth.getSession();
     if (session) {
       await bootAuthed(session.user);
+    } else {
+      bootUnauthed();
     }
-    // If no session and INITIAL_SESSION didn't fire with one, bootUnauthed was called above
     hideOAuthSplash();
   }
 
