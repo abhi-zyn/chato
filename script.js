@@ -53,12 +53,14 @@ function stopOnlineHeartbeat() {
   }
 }
 
-// Presence watcher — refreshes online status of other users in my chat list every 30s
+// Presence watcher — refreshes online status of other users in my chat list every 15s
 function startPresenceWatcher() {
   stopPresenceWatcher();
-  presenceWatcherId = setInterval(refreshPresence, 30000);
+  presenceWatcherId = setInterval(refreshPresence, 15000);
   // Also run immediately
-  setTimeout(refreshPresence, 1000);
+  setTimeout(refreshPresence, 500);
+  // Run again after a few seconds in case chats just loaded
+  setTimeout(refreshPresence, 3000);
 }
 function stopPresenceWatcher() {
   if (presenceWatcherId) {
@@ -92,6 +94,8 @@ async function refreshPresence() {
       activeChat.other.online = p.online;
       activeChat.other.last_seen = p.last_seen;
       if (convSt) convSt.textContent = p.online ? 'Online' : 'Offline';
+      const friendBtn = document.getElementById('convFriendBtn');
+      if (friendBtn) friendBtn.setAttribute('data-online', p.online ? 'true' : 'false');
     }
   } catch (e) {
     console.error('[refreshPresence]', e);
@@ -529,6 +533,8 @@ async function openChat(chatId, otherProfile, isStranger) {
   convAv.alt = other ? (other.full_name || other.display_name || other.username) : '';
   convNm.textContent = other ? (other.full_name || other.display_name || other.username) : 'Unknown';
   convSt.textContent = other && other.online ? 'Online' : 'Offline';
+  const friendBtn = document.getElementById('convFriendBtn');
+  if (friendBtn) friendBtn.setAttribute('data-online', other && other.online ? 'true' : 'false');
   showScreen('conv');
   await renderMessages(chatId);
   if (messageSub) { PopChatsDB.unsubscribe(messageSub); messageSub = null; }

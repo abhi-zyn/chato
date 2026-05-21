@@ -667,3 +667,41 @@ html,body { height:100%; width:100%; overflow:hidden; overscroll-behavior:none; 
   background:rgba(255,255,255,0.12);
   border-color:rgba(255,255,255,0.32);
 }
+
+/* Online indicator next to user name in conv header */
+.conv-title h2{display:inline-flex;align-items:center;gap:8px}
+.conv-title h2::before{
+  content:'';
+  width:8px;height:8px;border-radius:50%;
+  background:#bdbdbd;
+  flex-shrink:0;
+  transition:background 0.2s;
+}
+.conv-friend-btn[data-online="true"] .conv-title h2::before{
+  background:#4cd964;
+  box-shadow:0 0 8px rgba(76,217,100,0.6);
+}
+
+/* Status text colors based on online state */
+.conv-friend-btn[data-online="true"] .conv-title p{color:#4cd964;font-weight:500}
+
+/* Make online dot more prominent on chat cards */
+.chat-card .online{
+  width:12px !important;
+  height:12px !important;
+  background:#4cd964 !important;
+  box-shadow:
+    0 0 0 2.5px rgba(255,255,255,0.95),
+    0 2px 10px rgba(76,217,100,0.5),
+    0 0 14px rgba(76,217,100,0.4) !important;
+  z-index:5;
+  position:relative;
+}
+
+@media (min-width: 768px) {
+  /* Larger, brighter online dot on desktop */
+  .chat-card .online{
+    width:14px !important;
+    height:14px !important;
+  }
+}
