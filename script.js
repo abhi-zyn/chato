@@ -184,8 +184,24 @@ function showScreen(name, navView) {
 // ---------- chat list ----------
 async function loadChatList() {
   if (!chatList) return;
+  // Show cached chat list instantly
+  if (_cache.chats && _cache.chats.length) {
+    renderChatListDOM(_cache.chats);
+    // Background refresh
+    PopChatsDB.listMyChats().then(chats => {
+      _cache.chats = chats;
+      renderChatListDOM(chats);
+    }).catch(() => {});
+    return;
+  }
   chatList.innerHTML = '<div style="padding:24px;text-align:center;color:#9a9488;font-size:13px;">Loading…</div>';
   const chats = await PopChatsDB.listMyChats();
+  _cache.chats = chats;
+  renderChatListDOM(chats);
+}
+
+function renderChatListDOM(chats) {
+  if (!chatList) return;
   chatList.innerHTML = '';
   if (!chats.length) {
     chatList.innerHTML =
@@ -308,11 +324,32 @@ function setSendDisabled(disabled) {
   }
 }
 
+// ---------- Session cache (reduces network on repeated views) ----------
+const _cache = { chats: null, messages: {} };
+
 async function renderMessages(chatId) {
   msgBox.innerHTML = '';
-  const list = await PopChatsDB.listMessages(chatId);
-  list.forEach((m, i) => appendMessage(m, false, i));
-  requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
+  // Show cached messages instantly, then refresh in background
+  const cached = _cache.messages[chatId];
+  if (cached && cached.length) {
+    cached.forEach((m, i) => appendMessage(m, false, i));
+    requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
+    // Background refresh
+    PopChatsDB.listMessages(chatId).then(list => {
+      _cache.messages[chatId] = list;
+      // Only re-render if new messages arrived
+      if (list.length !== cached.length || (list.length && list[list.length-1].id !== cached[cached.length-1].id)) {
+        msgBox.innerHTML = '';
+        list.forEach((m, i) => appendMessage(m, false, i));
+        requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
+      }
+    }).catch(() => {});
+  } else {
+    const list = await PopChatsDB.listMessages(chatId);
+    _cache.messages[chatId] = list;
+    list.forEach((m, i) => appendMessage(m, false, i));
+    requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
+  }
 }
 
 function appendMessage(m, animate = true, idx = 0) {
@@ -327,6 +364,14 @@ function appendMessage(m, animate = true, idx = 0) {
     `<div class="msg-time">${formatTime(m.created_at)}</div>`;
   msgBox.appendChild(r);
   requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
+  // Keep cache in sync for realtime messages
+  if (animate && activeChat) {
+    const chatId = activeChat.id;
+    if (!_cache.messages[chatId]) _cache.messages[chatId] = [];
+    if (!_cache.messages[chatId].find(x => x.id === m.id)) {
+      _cache.messages[chatId].push(m);
+    }
+  }
 }
 
 async function sendMsg() {
