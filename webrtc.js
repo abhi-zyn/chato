@@ -117,10 +117,28 @@ window.WebRTCCall = (function () {
   }
 
   // -------- Public API --------
+  // Read user ID from Supabase session in localStorage (no client lock issues)
+  function getMyUserId() {
+    if (window.me && window.me.id) return window.me.id;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('sb-') && k.includes('auth-token')) {
+          const raw = localStorage.getItem(k);
+          if (!raw) continue;
+          const parsed = JSON.parse(raw);
+          const session = parsed.access_token ? parsed : (parsed.currentSession || null);
+          if (session && session.user && session.user.id) return session.user.id;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   // Start a call to a friend (creates the room, sends offer)
   async function startCall(friendId, video = false) {
     try {
-      const myId = window.me && window.me.id;
+      const myId = getMyUserId();
       if (!myId) {
         alert('You must be signed in to start a call.');
         return false;
@@ -284,7 +302,7 @@ window.WebRTCCall = (function () {
         if (currentCall && currentCall.initiator) return; // we're the offerer
         if (currentCall) return; // already in a call
 
-        const myId = window.me && window.me.id;
+        const myId = getMyUserId();
         // Extract friend id from room_id ("call:<a>_<b>")
         const parts = row.room_id.replace(/^call:/, '').split('_');
         const friendId = parts.find(p => p !== myId) || parts[0];
@@ -412,8 +430,9 @@ window.WebRTCCall = (function () {
   let inboundListener = null;
   function startInboundListener() {
     stopInboundListener();
-    if (!window.sb || !window.me || !window.me.id) return;
-    const myId = window.me.id;
+    if (!window.sb) return;
+    const myId = getMyUserId();
+    if (!myId) return;
     inboundListener = window.sb
       .channel('inbound:' + myId)
       .on(
