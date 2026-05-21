@@ -1459,7 +1459,7 @@ function showInstallBanner(onInstall) {
         <span>Add to your home screen for the best experience</span>
       </div>
       <div class="install-banner-actions">
-        ${onInstall ? '<button class="install-btn-yes" type="button">Install</button>' : ''}
+        ${onInstall ? '<button class="install-btn-yes" type="button">Install</button>' : '<button class="install-btn-yes" type="button">Install</button>'}
         <button class="install-btn-no" type="button">Not now</button>
       </div>
     </div>`;
@@ -1472,11 +1472,22 @@ function showInstallBanner(onInstall) {
     localStorage.setItem('popchats.installPromptAt', String(Date.now()));
   });
   const yesBtn = banner.querySelector('.install-btn-yes');
-  if (yesBtn && onInstall) {
+  if (yesBtn) {
     yesBtn.addEventListener('click', () => {
-      onInstall();
+      if (onInstall) {
+        onInstall();
+      } else {
+        // No native prompt — guide user
+        const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+        if (isIOS) {
+          toast('Tap the Share button ↑ then "Add to Home Screen"');
+        } else {
+          toast('Tap your browser menu ⋮ then "Install app"');
+        }
+      }
       banner.classList.remove('show');
       setTimeout(() => banner.remove(), 300);
+      localStorage.setItem('popchats.installPromptAt', String(Date.now()));
     });
   }
   // Auto-dismiss after 15s

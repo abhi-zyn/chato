@@ -559,7 +559,7 @@ html,body { height:100%; width:100%; overflow:hidden; overscroll-behavior:none; 
 
 /* ----- PWA Install Banner ----- */
 #installBanner{
-  position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);
+  position:fixed;top:12px;left:50%;transform:translateX(-50%) translateY(-20px);
   z-index:9998;opacity:0;pointer-events:none;
   transition:opacity .3s ease, transform .3s ease;
   width:calc(100% - 32px);max-width:400px;
@@ -591,5 +591,5 @@ html,body { height:100%; width:100%; overflow:hidden; overscroll-behavior:none; 
   cursor:pointer;
 }
 @media(min-width:768px){
-  #installBanner{bottom:24px}
+  #installBanner{top:16px}
 }
