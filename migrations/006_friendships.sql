@@ -459,25 +459,38 @@ $$;
 grant execute on function public.get_or_create_dm(uuid) to authenticated;
 
 -- ---------- Tighten message insert: friends-only for DMs ----------
+-- Helper wrapper so the policy doesn't re-resolve `chat_id` against chat_members.
+create or replace function public.can_message_chat(_chat_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.chats c
+     where c.id = _chat_id and c.is_stranger = true
+  ) or exists (
+    select 1
+      from public.chat_members m1
+      join public.chat_members m2
+        on m1.chat_id = m2.chat_id
+     where m1.chat_id = _chat_id
+       and m1.user_id = auth.uid()
+       and m2.user_id <> auth.uid()
+       and public.are_friends(m1.user_id, m2.user_id)
+  );
+$$;
+
+grant execute on function public.can_message_chat(uuid) to authenticated;
+
 drop policy if exists "messages_insert_self" on public.messages;
 create policy "messages_insert_self" on public.messages
   for insert to authenticated
   with check (
     sender_id = auth.uid()
     and public.is_chat_member(chat_id)
-    and (
-      exists (select 1 from public.chats c where c.id = chat_id and c.is_stranger = true)
-      or exists (
-        select 1
-          from public.chat_members m1
-          join public.chat_members m2
-            on m1.chat_id = m2.chat_id
-         where m1.chat_id = chat_id
-           and m1.user_id = auth.uid()
-           and m2.user_id <> auth.uid()
-           and public.are_friends(m1.user_id, m2.user_id)
-      )
-    )
+    and public.can_message_chat(chat_id)
   );
 
 -- ---------- Realtime: friendships ----------
