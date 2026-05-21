@@ -6,6 +6,18 @@
 .desktop-conv-empty { display: none; }
 
 @media (min-width: 768px) {
+  /* Backdrop blur for modals on desktop */
+  .modal-overlay.active::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(8px);
+    z-index: -1;
+  }
 
   /* --- Pink/rose ambient glow behind everything --- */
   body::after {
