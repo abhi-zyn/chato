@@ -318,13 +318,6 @@ function handleIncomingMessage(msg) {
     arr.slice(0, 250).forEach(id => _seenMessageIds.delete(id));
   }
   
-  console.log('[realtime] message received:', msg.id);
-  
-  // Ignore my own messages (already handled by send flow)
-  if (me && msg.sender_id === me.id) {
-    return;
-  }
-
   // Update last message in cached chat list for instant preview
   if (_cache.chats) {
     const chat = _cache.chats.find(c => c.id === msg.chat_id);
@@ -332,13 +325,21 @@ function handleIncomingMessage(msg) {
       chat.last_text = msg.text || '';
       chat.last_at = msg.created_at;
     }
+    _cache.chats = _cache.chats; // persist to localStorage
   }
+
+  // Update the preview text on the card directly (instant, no re-render)
+  updateChatCardPreview(msg.chat_id, msg.text || '');
 
   // If this chat is currently open, append message directly (no unread bump)
   if (activeChat && activeChat.id === msg.chat_id) {
+    if (me && msg.sender_id === me.id) return; // already shown via send flow
     appendMessage(msg);
     return;
   }
+
+  // Ignore my own messages for unread bump (already handled by send flow)
+  if (me && msg.sender_id === me.id) return;
 
   // Bump unread counter
   _unread.inc(msg.chat_id);
@@ -351,13 +352,24 @@ function handleIncomingMessage(msg) {
     if (idx > 0) {
       const [chat] = _cache.chats.splice(idx, 1);
       _cache.chats.unshift(chat);
-      _cache.chats = _cache.chats; // trigger setter to persist
+      _cache.chats = _cache.chats; // persist
       renderChatListDOM(_cache.chats);
     }
   }
 
   // Subtle ping sound (optional, only if permitted)
   playMessagePing();
+}
+
+// Update just the preview text on a chat card (no full re-render)
+function updateChatCardPreview(chatId, text) {
+  if (!chatList) return;
+  const card = chatList.querySelector(`.chat-card[data-id="${chatId}"]`);
+  if (!card) return;
+  const sub = card.querySelector('.chat-sub');
+  if (sub) {
+    sub.textContent = text || '';
+  }
 }
 
 // Subtle audio ping for new messages
@@ -641,6 +653,16 @@ async function sendMsg() {
     const saved = await PopChatsDB.sendMessage(activeChat.id, txt);
     // Replace temp row id with the real DB id so realtime echo dedupes
     if (saved && saved.id) r.id = 'msg-' + saved.id;
+    // Update chat list preview with my own message text
+    if (_cache.chats) {
+      const chat = _cache.chats.find(c => c.id === activeChat.id);
+      if (chat) {
+        chat.last_text = txt;
+        chat.last_at = new Date().toISOString();
+        _cache.chats = _cache.chats;
+      }
+    }
+    updateChatCardPreview(activeChat.id, txt);
   } catch (e) {
     console.error(e);
     r.remove();
