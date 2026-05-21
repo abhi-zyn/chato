@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="style.css?v=3">
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="login.css?v=3">
+<link rel="stylesheet" href="desktop.css?v=1">
 <script>
   // Show OAuth splash IMMEDIATELY if URL has ?code= (before main script runs)
   (function () {
@@ -385,6 +386,106 @@
   <button class="nav-btn" data-view="calls"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></button>
   <button class="nav-btn" data-view="profile"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
 </nav>
+
+<!-- DESKTOP SIDEBAR (visible only ≥768px, hidden until logged in) -->
+<aside class="desktop-sidebar" id="desktopSidebar" aria-label="Primary navigation">
+  <div class="sb-ambient"></div>
+
+  <!-- Icon rail (always visible) -->
+  <div class="sb-rail">
+    <div class="sb-traffic">
+      <span class="tl tl-r"></span>
+      <span class="tl tl-y"></span>
+      <span class="tl tl-g"></span>
+    </div>
+    <div class="sb-rail-icons">
+      <button class="sb-icon-btn active" data-view="chats" title="Chats">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </button>
+      <button class="sb-icon-btn" data-view="notifications" title="Notifications">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      </button>
+      <button class="sb-icon-btn" data-view="add" title="New chat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+      <button class="sb-icon-btn" data-view="calls" title="Calls">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+      </button>
+      <button class="sb-icon-btn" data-view="profile" title="Profile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </button>
+      <div class="sb-spacer"></div>
+      <button class="sb-icon-btn sb-mini-avatar" id="sbMiniAvatar" title="Profile">
+        <img id="sbMiniAvatarImg" src="https://api.dicebear.com/7.x/initials/svg?seed=PopChats" alt=""/>
+      </button>
+    </div>
+  </div>
+
+  <!-- Expanded panel (slides open/close) -->
+  <div class="sb-panel" id="sbPanel">
+    <div class="sb-panel-header">
+      <h3 class="sb-panel-title">PopChats</h3>
+      <button class="sb-collapse-btn" id="sbCollapseBtn" title="Collapse">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+    </div>
+
+    <div class="sb-panel-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" id="sbPanelSearchInput" placeholder="Search…" autocomplete="off"/>
+    </div>
+
+    <nav class="sb-panel-nav">
+      <a class="sb-item active" data-view="chats">
+        <span class="sb-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+        <span class="sb-item-label">Chats</span>
+        <span class="sb-item-chev">›</span>
+      </a>
+      <a class="sb-item" data-view="add">
+        <span class="sb-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+        <span class="sb-item-label">New chat</span>
+        <span class="sb-item-chev">›</span>
+      </a>
+      <a class="sb-item" data-view="notifications">
+        <span class="sb-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
+        <span class="sb-item-label">Notifications</span>
+        <span class="sb-item-chev">›</span>
+      </a>
+      <a class="sb-item" data-view="calls">
+        <span class="sb-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
+        <span class="sb-item-label">Calls</span>
+        <span class="sb-item-chev">›</span>
+      </a>
+    </nav>
+
+    <div class="sb-divider"></div>
+
+    <nav class="sb-panel-nav">
+      <a class="sb-item" id="sbSettingsItem">
+        <span class="sb-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+        <span class="sb-item-label">Settings</span>
+        <span class="sb-item-chev">›</span>
+      </a>
+      <a class="sb-item">
+        <span class="sb-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15 8 22 9 17 14 18 21 12 18 6 21 7 14 2 9 9 8 12 2"/></svg></span>
+        <span class="sb-item-label">Subscription</span>
+        <span class="sb-item-dot"></span>
+        <span class="sb-item-chev">›</span>
+      </a>
+    </nav>
+
+    <!-- Bottom user card -->
+    <div class="sb-user-card" id="sbUserCard">
+      <img class="sb-user-avatar" id="sbUserAvatar" src="https://api.dicebear.com/7.x/initials/svg?seed=PopChats" alt=""/>
+      <div class="sb-user-meta">
+        <div class="sb-user-name" id="sbUserName">PopChats</div>
+        <div class="sb-user-tier">Premium Account</div>
+      </div>
+      <span class="sb-item-chev">›</span>
+    </div>
+  </div>
+</aside>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
 <script src="supabase-client.js"></script>

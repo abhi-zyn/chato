@@ -107,6 +107,20 @@ function applyTheme(name, persist = true) {
 function setNavActive(view) {
   document.querySelectorAll('.nav-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.view === view));
+  // Mirror to desktop sidebar
+  document.querySelectorAll('.sb-icon-btn[data-view]').forEach(b =>
+    b.classList.toggle('active', b.dataset.view === view));
+  document.querySelectorAll('.sb-item[data-view]').forEach(b =>
+    b.classList.toggle('active', b.dataset.view === view));
+}
+
+function navTo(v) {
+  setNavActive(v);
+  if (v === 'chats')              { showScreen('chats', 'chats'); loadChatList(); }
+  else if (v === 'profile')       { showScreen('profile', 'profile'); refreshProfileScreen(); }
+  else if (v === 'notifications') { showScreen('notifications', 'notifications'); loadNotificationsScreen(); }
+  else if (v === 'calls')         { showScreen('calls', 'calls'); loadCallsScreen(); }
+  else if (v === 'add')           openModal();
 }
 function showScreen(name, navView) {
   [sLogin, sChats, sConv, sProfile, sSettings, sNotifications, sCalls]
@@ -119,6 +133,8 @@ function showScreen(name, navView) {
   // Hide bottom nav on screens where it shouldn't appear
   const hideNavOn = ['login', 'conv'];
   if (nav) nav.style.display = hideNavOn.includes(name) ? 'none' : 'flex';
+  // Toggle body authed flag (drives desktop sidebar visibility)
+  document.body.classList.toggle('is-authed', name !== 'login');
 }
 
 // ---------- chat list ----------
@@ -568,6 +584,13 @@ function refreshProfileScreen() {
       bioEl.style.display = 'none';
     }
   }
+  // Sidebar user card + mini avatar
+  const sbName = document.getElementById('sbUserName');
+  const sbAv = document.getElementById('sbUserAvatar');
+  const sbMini = document.getElementById('sbMiniAvatarImg');
+  if (sbName) sbName.textContent = me.full_name || me.display_name || me.username;
+  if (sbAv) sbAv.src = avatarOf(me);
+  if (sbMini) sbMini.src = avatarOf(me);
 }
 
 // ---------- Onboarding modal ----------
@@ -976,16 +999,42 @@ function bootUnauthed() {
 
   // Bottom nav
   document.querySelectorAll('.nav-btn').forEach(b => {
-    b.addEventListener('click', () => {
-      const v = b.dataset.view;
-      setNavActive(v);
-      if (v === 'chats')         { showScreen('chats', 'chats'); loadChatList(); }
-      else if (v === 'profile')  { showScreen('profile', 'profile'); refreshProfileScreen(); }
-      else if (v === 'notifications') { showScreen('notifications', 'notifications'); loadNotificationsScreen(); }
-      else if (v === 'calls')    { showScreen('calls', 'calls'); loadCallsScreen(); }
-      else if (v === 'add')      openModal();
-    });
+    b.addEventListener('click', () => navTo(b.dataset.view));
   });
+
+  // Desktop sidebar (icon rail + expanded items)
+  document.querySelectorAll('.sb-icon-btn[data-view], .sb-item[data-view]').forEach(b => {
+    b.addEventListener('click', () => navTo(b.dataset.view));
+  });
+  // Settings shortcut in sidebar
+  const sbSettings = document.getElementById('sbSettingsItem');
+  if (sbSettings) sbSettings.addEventListener('click',
+    () => showScreen('settings', 'profile'));
+  // Sidebar collapse toggle
+  const sbCollapseBtn = document.getElementById('sbCollapseBtn');
+  if (sbCollapseBtn) sbCollapseBtn.addEventListener('click',
+    () => document.body.classList.toggle('sb-collapsed'));
+  // Mini avatar (icon rail) opens profile
+  const sbMiniAvatar = document.getElementById('sbMiniAvatar');
+  if (sbMiniAvatar) sbMiniAvatar.addEventListener('click',
+    () => navTo('profile'));
+  // Bottom user card → profile
+  const sbUserCard = document.getElementById('sbUserCard');
+  if (sbUserCard) sbUserCard.addEventListener('click',
+    () => navTo('profile'));
+  // Sidebar search → reuses chats search
+  const sbSearchInput = document.getElementById('sbPanelSearchInput');
+  if (sbSearchInput) {
+    let sbSearchTimer = null;
+    sbSearchInput.addEventListener('input', () => {
+      clearTimeout(sbSearchTimer);
+      const q = sbSearchInput.value.trim();
+      sbSearchTimer = setTimeout(() => {
+        showScreen('chats', 'chats');
+        runChatsSearch(q);
+      }, 220);
+    });
+  }
 
   // Theme cards
   document.querySelectorAll('.theme-card').forEach(c => {
