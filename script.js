@@ -1532,13 +1532,35 @@ async function bootAuthed(user) {
       me = await profilePromise;
 
       if (!me) {
-        const fallbackUsername = ((user && user.email) || 'user_' + Date.now()).split('@')[0]
-          .replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 24);
+        // No profile row — create one using auth metadata (Google: full_name, picture)
+        const meta = (user && user.user_metadata) || {};
+        const email = (user && user.email) || '';
+        const fallbackUsername = (meta.username || email).split('@')[0]
+          .replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 24) || ('user_' + Date.now().toString(36));
+        const fallbackName = meta.full_name || meta.name || meta.display_name || fallbackUsername;
+        const fallbackAvatar = meta.avatar_url || meta.picture || null;
         try {
           me = await withTimeout(
-            PopChatsDB.upsertMyProfile({ username: fallbackUsername, display_name: fallbackUsername }),
+            PopChatsDB.upsertMyProfile({
+              username: fallbackUsername,
+              display_name: fallbackName,
+              full_name: fallbackName,
+              avatar_url: fallbackAvatar
+            }),
             8000, 'upsertMyProfile');
         } catch (e) { console.error('profile init failed', e); }
+      } else {
+        // Profile exists but may be missing data (older trigger version) — hydrate from auth metadata
+        const meta = (user && user.user_metadata) || {};
+        const patch = {};
+        if (!me.full_name && (meta.full_name || meta.name)) patch.full_name = meta.full_name || meta.name;
+        if (!me.avatar_url && (meta.avatar_url || meta.picture)) patch.avatar_url = meta.avatar_url || meta.picture;
+        if (!me.display_name && (meta.full_name || meta.name)) patch.display_name = meta.full_name || meta.name;
+        if (Object.keys(patch).length) {
+          try {
+            me = await PopChatsDB.updateMyProfile(patch);
+          } catch (e) { console.error('hydrate profile failed', e); }
+        }
       }
 
       // 3) Theme + profile rendering depends on `me`
