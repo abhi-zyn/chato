@@ -1857,18 +1857,38 @@ function bootUnauthed() {
     }
   });
 
-  // Auth state — INITIAL_SESSION is handled explicitly below to avoid double-boot.
+  // Auth state
+  const hadOAuthCode = !!(new URLSearchParams(window.location.search).get('code'));
   PopChatsAuth.onAuthChange(async (event, session) => {
-    if (event === 'INITIAL_SESSION') return;
+    if (event === 'INITIAL_SESSION') {
+      // On OAuth callback, Supabase auto-exchanges the code and fires INITIAL_SESSION
+      // with the new session. We must handle it here.
+      if (session) {
+        clearTimeout(splashWatchdog);
+        // Clean URL
+        const u = new URL(window.location.href);
+        u.searchParams.delete('code');
+        u.searchParams.delete('state');
+        window.history.replaceState({}, document.title, u.pathname + u.search + u.hash);
+        await bootAuthed(session.user);
+        hideOAuthSplash();
+      } else if (!hadOAuthCode) {
+        // Normal load with no session — show login
+        bootUnauthed();
+        hideOAuthSplash();
+      }
+      return;
+    }
     if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
       if (session) await bootAuthed(session.user); else bootUnauthed();
     } else if (event === 'SIGNED_OUT') {
       bootUnauthed();
     }
-    // PASSWORD_RECOVERY → reset.html handles it
   });
 
-  // Handle OAuth callback (?code=...) — show splash, run PKCE exchange
+  // Handle OAuth callback (?code=...) — splash is shown by the inline head script.
+  // Supabase's detectSessionInUrl:true auto-exchanges the code and fires INITIAL_SESSION.
+  // We just need the splash watchdog and error handling.
   const urlObj = new URL(window.location.href);
   const oauthCode = urlObj.searchParams.get('code');
   const oauthError = urlObj.searchParams.get('error') || urlObj.searchParams.get('error_description');
@@ -1882,58 +1902,24 @@ function bootUnauthed() {
       clearTimeout(splashWatchdog);
       hideOAuthSplash();
       toast('Sign-in cancelled or failed.');
+      urlObj.searchParams.delete('error');
+      urlObj.searchParams.delete('error_description');
+      window.history.replaceState({}, document.title, urlObj.pathname);
       bootUnauthed();
     }, 600);
   } else if (oauthCode) {
+    // Show splash — INITIAL_SESSION handler above will complete the flow
     showOAuthSplash(true);
-    try {
-      // detectSessionInUrl may already have consumed the code. Try getSession first.
-      let { data: { session } } = await window.sb.auth.getSession();
-      if (!session) {
-        const res = await window.sb.auth.exchangeCodeForSession(window.location.href);
-        if (res.error) throw res.error;
-        session = res.data && res.data.session;
-      }
-      // Clean URL
-      urlObj.searchParams.delete('code');
-      urlObj.searchParams.delete('state');
-      window.history.replaceState({}, document.title, urlObj.pathname + urlObj.search + urlObj.hash);
-
-      if (session) {
-        // Hide splash IMMEDIATELY — the screen switches to chats inside bootAuthed.
-        // We don't await bootAuthed (avoid blocking on slow profile/chat-list queries).
-        clearTimeout(splashWatchdog);
-        showScreen('chats', 'chats');
-        hideOAuthSplash();
-        bootAuthed(session.user).catch(err => console.error('bootAuthed (oauth):', err));
-        return;
-      }
-      // No session for some reason — fall through to login.
-      clearTimeout(splashWatchdog);
-      hideOAuthSplash();
-    } catch (e) {
-      console.error('[OAuth] exchange failed:', e);
-      const msg = (e.message || '').toLowerCase();
-      const friendly = msg.includes('verifier') || msg.includes('flow state')
-        ? 'Sign-in expired. Please try again.'
-        : 'Sign-in failed: ' + (e.message || 'unknown');
-      clearTimeout(splashWatchdog);
-      hideOAuthSplash();
-      toast(friendly);
-      // Clean URL so the error doesn't loop on refresh
-      urlObj.searchParams.delete('code');
-      urlObj.searchParams.delete('state');
-      window.history.replaceState({}, document.title, urlObj.pathname);
-    }
   } else {
     clearTimeout(splashWatchdog);
+    // Normal load (no OAuth) — check for existing session
+    const session = await PopChatsAuth.getSession();
+    if (session) {
+      await bootAuthed(session.user);
+    }
+    // If no session and INITIAL_SESSION didn't fire with one, bootUnauthed was called above
+    hideOAuthSplash();
   }
-
-  const session = await PopChatsAuth.getSession();
-  if (session) await bootAuthed(session.user);
-  else bootUnauthed();
-  // Hide splash now that auth state is determined for normal (non-OAuth) loads
-  hideOAuthSplash();
 
   // Clock
   function updateClock() {
