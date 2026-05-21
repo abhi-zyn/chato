@@ -259,43 +259,41 @@ window.PopChatsDB = (function () {
 
   // ---------- chats ----------
   async function listMyChats() {
-    const id = await uid(); if (!id) return [];
+    const id = getUserIdSync();
+    if (!id) return [];
 
-    const { data: memberships, error: e1 } = await client()
-      .from('chat_members').select('chat_id').eq('user_id', id);
-    if (e1) { console.error('[listMyChats memberships]', e1); return []; }
-    const chatIds = (memberships || []).map(m => m.chat_id);
+    // Use raw fetch for all queries to bypass supabase-js client lock
+    const m1 = await rawSelect('chat_members', `user_id=eq.${id}&select=chat_id`);
+    if (m1.error) { console.error('[listMyChats memberships]', m1.error); return []; }
+    const chatIds = (m1.data || []).map(m => m.chat_id);
     if (!chatIds.length) return [];
+    const inList = `(${chatIds.join(',')})`;
 
-    const { data: chats, error: e2 } = await client()
-      .from('chats').select('*').in('id', chatIds);
-    if (e2) { console.error('[listMyChats chats]', e2); return []; }
+    const m2 = await rawSelect('chats', `id=in.${inList}&select=*`);
+    if (m2.error) { console.error('[listMyChats chats]', m2.error); return []; }
+    const chats = m2.data || [];
 
-    const { data: allMembers } = await client()
-      .from('chat_members').select('chat_id,user_id').in('chat_id', chatIds);
+    const m3 = await rawSelect('chat_members', `chat_id=in.${inList}&select=chat_id,user_id`);
+    const allMembers = m3.data || [];
 
-    const otherIds = [...new Set((allMembers || [])
+    const otherIds = [...new Set(allMembers
       .filter(m => m.user_id !== id).map(m => m.user_id))];
 
     let profiles = [];
     if (otherIds.length) {
-      const { data } = await client().from('profiles').select('*').in('id', otherIds);
-      profiles = data || [];
+      const p = await rawSelect('profiles', `id=in.(${otherIds.join(',')})&select=*`);
+      profiles = p.data || [];
     }
     const profileMap = Object.fromEntries(profiles.map(p => [p.id, p]));
 
-    const { data: msgs, error: msgsErr } = await client()
-      .from('messages').select('chat_id,text,text_enc,created_at')
-      .in('chat_id', chatIds)
-      .order('created_at', { ascending: false });
-    // Fallback if text_enc column doesn't exist yet (migration not run)
-    let msgsList = msgs;
-    if (msgsErr) {
-      const { data: msgs2 } = await client()
-        .from('messages').select('chat_id,text,created_at')
-        .in('chat_id', chatIds)
-        .order('created_at', { ascending: false });
-      msgsList = msgs2;
+    const m4 = await rawSelect('messages', 
+      `chat_id=in.${inList}&select=chat_id,text,text_enc,created_at&order=created_at.desc`);
+    let msgsList = m4.data;
+    if (m4.error) {
+      // Fallback if text_enc column doesn't exist
+      const m4b = await rawSelect('messages',
+        `chat_id=in.${inList}&select=chat_id,text,created_at&order=created_at.desc`);
+      msgsList = m4b.data || [];
     }
     const lastMsg = {};
     (msgsList || []).forEach(m => { if (!lastMsg[m.chat_id]) lastMsg[m.chat_id] = m; });
