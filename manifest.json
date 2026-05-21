@@ -1,0 +1,26 @@
+{
+  "name": "PopChats",
+  "short_name": "PopChats",
+  "description": "Chat with friends — fast, private, beautiful.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#e0f7fa",
+  "theme_color": "#4dd0e1",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "48x48 72x72 96x96 128x128 192x192 256x256 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["social", "communication"],
+  "prefer_related_applications": false
+}

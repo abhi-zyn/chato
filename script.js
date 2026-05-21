@@ -90,6 +90,14 @@ const themes = {
               orb1:'rgba(128,222,234,0.8)', orb2:'rgba(178,235,242,0.7)', orb3:'rgba(224,247,250,0.6)' },
   sunset:   { bg:'linear-gradient(135deg,#fff3e0 0%,#ffe0b2 50%,#ffcc80 100%)',
               orb1:'rgba(255,204,128,0.8)', orb2:'rgba(255,224,178,0.7)', orb3:'rgba(255,243,224,0.6)' },
+  offwhite: { bg:'linear-gradient(135deg,#fafaf8 0%,#f5f3ef 50%,#edeae4 100%)',
+              orb1:'rgba(230,225,215,0.7)', orb2:'rgba(240,235,225,0.6)', orb3:'rgba(220,215,205,0.5)' },
+  midnight: { bg:'linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)',
+              orb1:'rgba(15,52,96,0.8)', orb2:'rgba(22,33,62,0.7)', orb3:'rgba(26,26,46,0.6)' },
+  rose:     { bg:'linear-gradient(135deg,#fff0f3 0%,#ffd6e0 50%,#ffb3c6 100%)',
+              orb1:'rgba(255,179,198,0.8)', orb2:'rgba(255,214,224,0.7)', orb3:'rgba(255,240,243,0.6)' },
+  mint:     { bg:'linear-gradient(135deg,#f0fff4 0%,#c6f6d5 50%,#9ae6b4 100%)',
+              orb1:'rgba(154,230,180,0.8)', orb2:'rgba(198,246,213,0.7)', orb3:'rgba(240,255,244,0.6)' },
 };
 const THEME_STORAGE_KEY = 'popchats.theme';
 

@@ -175,6 +175,10 @@ html,body { height:100%; width:100%; overflow:hidden; overscroll-behavior:none; 
 .preview-lavender{background:linear-gradient(135deg,#f3e7ff 0%,#ffeef8 50%,#e8e0ff 100%)}
 .preview-ocean{background:linear-gradient(135deg,#e0f7fa 0%,#b2ebf2 50%,#80deea 100%)}
 .preview-sunset{background:linear-gradient(135deg,#fff3e0 0%,#ffe0b2 50%,#ffcc80 100%)}
+.preview-offwhite{background:linear-gradient(135deg,#fafaf8 0%,#f5f3ef 50%,#edeae4 100%)}
+.preview-midnight{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)}
+.preview-rose{background:linear-gradient(135deg,#fff0f3 0%,#ffd6e0 50%,#ffb3c6 100%)}
+.preview-mint{background:linear-gradient(135deg,#f0fff4 0%,#c6f6d5 50%,#9ae6b4 100%)}
 
 /* BOTTOM NAV */
 .bottom-nav{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:100;display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:36px;border:1px solid rgba(255,255,255,0.22);background:rgba(255,255,255,0.1);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);box-shadow:0 20px 60px rgba(0,0,0,0.12),0 0 0 1px rgba(255,255,255,0.15) inset;max-width:320px;width:calc(100% - 48px);justify-content:space-around}
