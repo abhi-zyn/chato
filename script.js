@@ -127,17 +127,17 @@ function showScreen(name, navView) {
   const isDesktop = window.innerWidth >= 768;
 
   if (isDesktop && name === 'conv') {
-    // Desktop: keep chat list visible, just show conv panel alongside
-    sConv.classList.add('active');
-    // Hide other non-chat screens
+    // Desktop: keep chat list visible, show conv alongside
     [sProfile, sSettings, sNotifications, sCalls].forEach(s => s && s.classList.remove('active'));
+    sConv.classList.add('active');
     document.body.classList.add('desktop-conv-open');
+    document.body.classList.remove('show-other-screen');
     if (navView) setNavActive(navView);
-    document.body.classList.toggle('is-authed', true);
+    document.body.classList.add('is-authed');
     return;
   }
 
-  // Normal flow
+  // Remove active from all screens
   [sLogin, sChats, sConv, sProfile, sSettings, sNotifications, sCalls]
     .forEach(s => s && s.classList.remove('active'));
   const map = { login:sLogin, chats:sChats, conv:sConv, profile:sProfile,
@@ -150,9 +150,10 @@ function showScreen(name, navView) {
   document.body.classList.toggle('is-authed', name !== 'login');
   document.body.classList.remove('desktop-conv-open');
 
-  // Desktop: when switching to chats, also show chat list
-  if (isDesktop && name === 'chats') {
-    sChats.classList.add('active');
+  // Desktop: toggle class to hide chat list when showing other screens
+  if (isDesktop) {
+    const otherScreens = ['profile', 'settings', 'notifications', 'calls'];
+    document.body.classList.toggle('show-other-screen', otherScreens.includes(name));
   }
 }
 

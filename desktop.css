@@ -354,44 +354,51 @@
     flex-direction: row;
   }
 
+  /* Override base .screen absolute positioning for desktop split */
+  .screen {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    animation: none !important;
+  }
+
   /* Chat list panel — fixed width on left */
   #screenChats {
-    position: relative;
-    width: 340px;
-    min-width: 340px;
-    max-width: 340px;
+    width: 360px;
+    min-width: 360px;
+    max-width: 360px;
     flex-shrink: 0;
     border-right: 1px solid rgba(0, 0, 0, 0.06);
     display: flex !important;
-    bottom: 0;
+    height: 100%;
   }
-  /* Only show chat list when authed and not on login */
   body:not(.is-authed) #screenChats { display: none !important; }
+  /* Hide chat list when other screens are active */
+  body.is-authed.show-other-screen #screenChats { display: none !important; }
 
   /* Conversation panel — fills remaining space */
   #screenConv {
-    position: relative;
     flex: 1;
-    display: none;
-    bottom: 0;
+    display: none !important;
+    height: 100%;
   }
   #screenConv.active {
-    display: flex;
+    display: flex !important;
   }
-  /* Hide back button on desktop (chat list always visible) */
   #screenConv .back-btn { display: none; }
 
   /* Empty conversation placeholder */
   .desktop-conv-empty {
     display: none;
-    position: relative;
     flex: 1;
     align-items: center;
     justify-content: center;
     flex-direction: column;
+    height: 100%;
   }
-  /* Show placeholder when conv is NOT active and we're on chats screen */
-  body.is-authed .desktop-conv-empty {
+  body.is-authed:not(.show-other-screen) .desktop-conv-empty {
     display: flex;
   }
   body.is-authed #screenConv.active ~ .desktop-conv-empty {
@@ -424,25 +431,22 @@
     margin: 0;
   }
 
-  /* Other screens (profile, settings, etc.) — overlay the right panel area */
+  /* Other screens (profile, settings, etc.) — take full right area */
   #screenProfile,
   #screenSettings,
   #screenNotifications,
   #screenCalls {
-    position: absolute;
-    left: 340px;
-    right: 0;
-    top: 0;
-    bottom: 0;
+    flex: 1;
+    height: 100%;
   }
-  /* When these screens are active, hide the empty placeholder */
-  #screenProfile.active ~ .desktop-conv-empty,
-  #screenSettings.active ~ .desktop-conv-empty,
-  #screenNotifications.active ~ .desktop-conv-empty,
-  #screenCalls.active ~ .desktop-conv-empty {
-    display: none;
+  #screenProfile.active,
+  #screenSettings.active,
+  #screenNotifications.active,
+  #screenCalls.active {
+    display: flex !important;
   }
-  /* When conv is active, also keep chat list visible */
+
+  /* When conv is active, keep chat list visible */
   body.is-authed.desktop-conv-open #screenChats {
     display: flex !important;
   }
