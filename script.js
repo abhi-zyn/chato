@@ -1055,6 +1055,47 @@ function bootUnauthed() {
     });
   }
 
+  // Desktop sidebar: show panel after 2s hover on rail, hide on leave
+  (function () {
+    const rail = document.querySelector('.sb-rail');
+    const panel = document.querySelector('.sb-panel');
+    const sidebar = document.getElementById('desktopSidebar');
+    if (!rail || !panel || !sidebar) return;
+    let hoverTimer = null;
+    let isOpen = false;
+
+    function openPanel() {
+      isOpen = true;
+      document.body.classList.add('sb-pane-open');
+    }
+    function closePanel() {
+      isOpen = false;
+      document.body.classList.remove('sb-pane-open');
+    }
+
+    rail.addEventListener('mouseenter', () => {
+      hoverTimer = setTimeout(openPanel, 2000);
+    });
+    rail.addEventListener('mouseleave', () => {
+      clearTimeout(hoverTimer);
+      // Don't close if mouse moved to panel
+      setTimeout(() => {
+        if (!sidebar.matches(':hover')) closePanel();
+      }, 100);
+    });
+    panel.addEventListener('mouseleave', () => {
+      // Close when mouse leaves the panel (and isn't on rail)
+      setTimeout(() => {
+        if (!sidebar.matches(':hover')) closePanel();
+      }, 100);
+    });
+    // Also allow clicking a rail icon to instantly open panel
+    rail.addEventListener('click', () => {
+      clearTimeout(hoverTimer);
+      if (!isOpen) openPanel();
+    });
+  })();
+
   // Theme cards
   document.querySelectorAll('.theme-card').forEach(c => {
     c.addEventListener('click', () => applyTheme(c.dataset.theme));

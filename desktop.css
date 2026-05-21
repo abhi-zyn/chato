@@ -26,14 +26,11 @@
     inset: 0;
     max-width: none;
     margin: 0;
-    padding-left: 396px;     /* 16 left + 60 rail + 14 gap + 290 panel + 16 right gap */
+    padding-left: 92px;     /* 16 left + 60 rail + 16 right gap (panel overlays) */
     transition: padding-left 0.25s ease;
   }
+  /* Legacy collapse class — kept for back-compat, same rule */
   body.sb-collapsed .app { padding-left: 92px; }
-  body.sb-collapsed .sb-panel {
-    transform: translateX(-100%);
-    pointer-events: none;
-  }
 
   .bottom-nav { display: none !important; }
 
@@ -188,12 +185,22 @@
     border-radius: 26px;
     display: flex;
     flex-direction: column;
-    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
     color: rgba(255, 255, 255, 0.92);
     box-shadow:
       0 24px 60px rgba(0, 0, 0, 0.4),
       inset 0 1px 0 rgba(255, 255, 255, 0.08);
     padding-top: 4px;
+    /* Hidden by default — slides in from left */
+    transform: translateX(-20px);
+    opacity: 0;
+    pointer-events: none;
+  }
+  /* Show panel when body has .sb-pane-open */
+  body.sb-pane-open .sb-panel {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: all;
   }
 
   .sb-panel-traffic {
