@@ -1006,14 +1006,32 @@ function bootUnauthed() {
   document.querySelectorAll('.sb-icon-btn[data-view], .sb-item[data-view]').forEach(b => {
     b.addEventListener('click', () => navTo(b.dataset.view));
   });
-  // Settings shortcut in sidebar
+  // Settings shortcut in sidebar (rail + panel)
   const sbSettings = document.getElementById('sbSettingsItem');
   if (sbSettings) sbSettings.addEventListener('click',
     () => showScreen('settings', 'profile'));
-  // Sidebar collapse toggle
-  const sbCollapseBtn = document.getElementById('sbCollapseBtn');
-  if (sbCollapseBtn) sbCollapseBtn.addEventListener('click',
-    () => document.body.classList.toggle('sb-collapsed'));
+  const sbRailSettings = document.getElementById('sbRailSettings');
+  if (sbRailSettings) sbRailSettings.addEventListener('click',
+    () => showScreen('settings', 'profile'));
+
+  // Information item (placeholder — could open about modal later)
+  const sbInfoItem = document.getElementById('sbInfoItem');
+  if (sbInfoItem) sbInfoItem.addEventListener('click',
+    () => toast('PopChats v1.0 — built with Supabase'));
+  const sbRailInfo = document.getElementById('sbRailInfo');
+  if (sbRailInfo) sbRailInfo.addEventListener('click',
+    () => toast('PopChats v1.0 — built with Supabase'));
+
+  // Sign out shortcuts (rail + panel) — reuse the main signOutBtn handler
+  function triggerSignOut() {
+    const btn = document.getElementById('signOutBtn');
+    if (btn) btn.click();
+  }
+  const sbRailSignOut = document.getElementById('sbRailSignOut');
+  if (sbRailSignOut) sbRailSignOut.addEventListener('click', triggerSignOut);
+  const sbPanelSignOut = document.getElementById('sbPanelSignOut');
+  if (sbPanelSignOut) sbPanelSignOut.addEventListener('click', triggerSignOut);
+
   // Mini avatar (icon rail) opens profile
   const sbMiniAvatar = document.getElementById('sbMiniAvatar');
   if (sbMiniAvatar) sbMiniAvatar.addEventListener('click',

@@ -1,14 +1,12 @@
 /* =========================================================================
-   PopChats — Desktop sidebar (≥768px only)
-   Mobile layout untouched.
+   PopChats — Desktop sidebar (≥768px only) — matches Pinterest reference
    ========================================================================= */
 
-/* Hide on mobile */
 .desktop-sidebar { display: none; }
 
 @media (min-width: 768px) {
 
-  /* --- Ambient pink/rose glow behind everything --- */
+  /* --- Pink/rose ambient glow behind everything --- */
   body::after {
     content: '';
     position: fixed;
@@ -16,241 +14,272 @@
     z-index: 0;
     pointer-events: none;
     background:
-      radial-gradient(circle at 18% 30%, rgba(244, 168, 184, 0.32) 0%, transparent 45%),
-      radial-gradient(circle at 22% 78%, rgba(220, 130, 165, 0.22) 0%, transparent 50%),
-      radial-gradient(circle at 70% 60%, rgba(180, 150, 220, 0.18) 0%, transparent 55%);
+      radial-gradient(circle at 16% 30%, rgba(244, 168, 184, 0.42) 0%, transparent 42%),
+      radial-gradient(circle at 18% 80%, rgba(220, 130, 165, 0.30) 0%, transparent 50%),
+      radial-gradient(circle at 60% 60%, rgba(180, 150, 220, 0.18) 0%, transparent 60%),
+      radial-gradient(circle at 90% 25%, rgba(255, 200, 215, 0.20) 0%, transparent 55%);
   }
 
-  /* --- App container takes full width minus sidebar --- */
+  /* --- App container shifts right by sidebar width --- */
   .app {
     position: fixed;
     inset: 0;
     max-width: none;
     margin: 0;
-    padding-left: 344px; /* 64 rail + 280 panel */
-    transition: padding-left 0.2s ease;
+    padding-left: 344px;     /* 64 rail + 280 panel */
+    transition: padding-left 0.25s ease;
   }
-  body.sb-collapsed .app {
-    padding-left: 64px; /* only rail when panel is collapsed */
-  }
-
-  /* When user has manually collapsed — also shift the app container */
+  body.sb-collapsed .app { padding-left: 64px; }
   body.sb-collapsed .sb-panel {
     transform: translateX(-100%);
     pointer-events: none;
   }
 
-  /* --- Hide mobile nav on desktop --- */
   .bottom-nav { display: none !important; }
 
   /* --- Sidebar shell --- */
   .desktop-sidebar {
     display: flex;
     position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 344px;
+    top: 12px;
+    left: 12px;
+    bottom: 12px;
     z-index: 50;
     font-family: 'Geist', sans-serif;
+    gap: 12px;
   }
-  .sb-ambient {
-    position: absolute;
-    inset: -40px -40px -40px -40px;
-    background: radial-gradient(ellipse at 30% 50%, rgba(244, 168, 184, 0.35) 0%, transparent 60%);
-    filter: blur(40px);
-    pointer-events: none;
-    z-index: -1;
-  }
+  .sb-ambient { display: none; }
 
-  /* --- Icon rail --- */
+  /* ============================================================
+     ICON RAIL — narrow, dark glass with traffic lights at top
+     ============================================================ */
   .sb-rail {
     width: 64px;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(20px) saturate(160%);
-    -webkit-backdrop-filter: blur(20px) saturate(160%);
-    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(15, 12, 14, 0.55);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 22px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 14px 0;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    padding: 12px 0 10px;
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
   .sb-traffic {
     display: flex;
     gap: 6px;
-    padding: 6px 0 16px;
-    align-items: center;
-    justify-content: center;
+    padding: 4px 0 14px;
   }
   .tl {
-    width: 11px; height: 11px; border-radius: 50%;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    width: 10px; height: 10px; border-radius: 50%;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
   }
   .tl-r { background: #ff5f57; }
   .tl-y { background: #febc2e; }
   .tl-g { background: #28c840; }
 
+  .sb-brand-square {
+    width: 32px; height: 32px;
+    background: white;
+    color: #1a1a18;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  }
+  .sb-brand-square svg { width: 18px; height: 18px; }
+
   .sb-rail-icons {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     width: 100%;
     flex: 1;
   }
+  .sb-rail-spacer {
+    flex: 1;
+    min-height: 12px;
+  }
+
+  /* Rail icon button — with left active-bar indicator */
   .sb-icon-btn {
-    width: 44px; height: 44px;
-    border-radius: 12px;
+    width: 40px; height: 40px;
+    border-radius: 11px;
     border: 1px solid transparent;
     background: transparent;
     color: rgba(255, 255, 255, 0.55);
     cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.18s ease;
     position: relative;
   }
+  .sb-icon-btn::before {
+    /* left active-bar indicator (matches reference) */
+    content: '';
+    position: absolute;
+    left: -14px;
+    top: 50%;
+    transform: translateY(-50%) scaleY(0);
+    width: 3px;
+    height: 22px;
+    border-radius: 0 3px 3px 0;
+    background: linear-gradient(180deg, #f4713a, #f4a876);
+    box-shadow: 0 0 8px rgba(244, 113, 58, 0.6);
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .sb-icon-btn.active::before { transform: translateY(-50%) scaleY(1); }
   .sb-icon-btn:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.92);
   }
   .sb-icon-btn.active {
     background: rgba(255, 255, 255, 0.12);
     color: white;
-    border-color: rgba(255, 255, 255, 0.12);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
   }
-  .sb-icon-btn svg { width: 19px; height: 19px; }
-  .sb-spacer { flex: 1; }
-  .sb-mini-avatar { padding: 0; overflow: hidden; }
-  .sb-mini-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+  .sb-icon-btn svg { width: 18px; height: 18px; }
+  .sb-rail-logout { color: rgba(255, 130, 130, 0.7); }
+  .sb-rail-logout:hover { color: #ff8585; background: rgba(255, 90, 90, 0.12); }
+  .sb-rail-logout::before { background: linear-gradient(180deg, #ff5f57, #ff8585); box-shadow: 0 0 8px rgba(255, 90, 90, 0.5); }
 
-  /* --- Expanded panel --- */
+  /* Bottom avatar on rail */
+  .sb-rail-avatar {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+    overflow: hidden;
+    margin-top: 8px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .sb-rail-avatar:hover { border-color: rgba(244, 113, 58, 0.7); transform: scale(1.06); }
+  .sb-rail-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  /* ============================================================
+     EXPANDED PANEL — wider glass card with "MENU" sections
+     ============================================================ */
   .sb-panel {
     width: 280px;
-    background: rgba(0, 0, 0, 0.42);
-    backdrop-filter: blur(24px) saturate(170%);
-    -webkit-backdrop-filter: blur(24px) saturate(170%);
-    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(20, 14, 18, 0.5);
+    backdrop-filter: blur(30px) saturate(170%);
+    -webkit-backdrop-filter: blur(30px) saturate(170%);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 22px;
     display: flex;
     flex-direction: column;
-    transition: transform 0.2s ease;
+    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
     color: rgba(255, 255, 255, 0.92);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    padding-top: 8px;
   }
 
-  .sb-panel-header {
+  .sb-panel-traffic {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 18px 18px 12px;
+    gap: 6px;
+    padding: 8px 0 10px 16px;
+  }
+  .sb-panel-header {
+    padding: 14px 22px 6px;
   }
   .sb-panel-title {
-    font-family: 'Instrument Serif', serif;
-    font-size: 22px;
-    font-weight: 400;
+    font-size: 26px;
+    font-weight: 700;
     color: white;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
+    line-height: 1;
   }
-  .sb-collapse-btn {
-    width: 28px; height: 28px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.7);
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s;
+  .sb-panel-section-label {
+    padding: 16px 22px 8px;
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.4);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
   }
-  .sb-collapse-btn:hover { background: rgba(255, 255, 255, 0.12); color: white; }
-  .sb-collapse-btn svg { width: 14px; height: 14px; }
 
-  /* --- Search box --- */
-  .sb-panel-search {
-    margin: 0 14px 12px;
-    padding: 10px 14px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    display: flex; align-items: center; gap: 10px;
-    transition: all 0.2s;
+  /* Nav rows */
+  .sb-panel-nav {
+    display: flex;
+    flex-direction: column;
+    padding: 0 12px;
+    gap: 2px;
   }
-  .sb-panel-search:focus-within {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.18);
-  }
-  .sb-panel-search svg { width: 14px; height: 14px; color: rgba(255, 255, 255, 0.45); flex-shrink: 0; }
-  .sb-panel-search input {
-    flex: 1;
-    border: none; outline: none; background: transparent;
-    color: white;
-    font-size: 13px;
-    font-family: 'Geist', sans-serif;
-  }
-  .sb-panel-search input::placeholder { color: rgba(255, 255, 255, 0.4); }
-
-  /* --- Nav items --- */
-  .sb-panel-nav { display: flex; flex-direction: column; padding: 4px 10px; gap: 2px; }
   .sb-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    border-radius: 10px;
-    color: rgba(255, 255, 255, 0.78);
-    font-size: 13.5px;
+    gap: 14px;
+    padding: 11px 14px;
+    border-radius: 12px;
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 14px;
     font-weight: 500;
     cursor: pointer;
     text-decoration: none;
     transition: all 0.18s ease;
-    position: relative;
   }
   .sb-item:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: white;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.92);
   }
   .sb-item.active {
-    background: rgba(255, 255, 255, 0.13);
+    background: rgba(255, 255, 255, 0.08);
     color: white;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
   }
   .sb-item-icon {
     width: 18px; height: 18px;
     display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
     color: currentColor;
     opacity: 0.85;
-    flex-shrink: 0;
   }
   .sb-item-icon svg { width: 17px; height: 17px; }
   .sb-item-label { flex: 1; }
   .sb-item-chev {
-    color: rgba(255, 255, 255, 0.35);
-    font-size: 18px;
-    line-height: 1;
-    transition: transform 0.2s, color 0.2s;
+    color: rgba(255, 255, 255, 0.28);
+    font-size: 22px;
+    line-height: 0.6;
+    font-weight: 300;
+    transition: color 0.2s, transform 0.2s;
   }
   .sb-item:hover .sb-item-chev { color: rgba(255, 255, 255, 0.7); transform: translateX(2px); }
-  .sb-item.active .sb-item-chev { color: rgba(255, 255, 255, 0.9); }
+  .sb-item.active .sb-item-chev { color: white; }
   .sb-item-dot {
     width: 7px; height: 7px;
-    background: #f4713a;
+    background: white;
     border-radius: 50%;
-    box-shadow: 0 0 8px rgba(244, 113, 58, 0.6);
-    margin-right: 4px;
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.5);
+    margin-right: -4px;
   }
+
+  .sb-item-logout {
+    color: rgba(255, 130, 130, 0.75);
+  }
+  .sb-item-logout:hover { background: rgba(255, 90, 90, 0.1); color: #ff8585; }
 
   .sb-divider {
     height: 1px;
     background: rgba(255, 255, 255, 0.07);
-    margin: 12px 18px;
+    margin: 18px 22px;
   }
 
   /* --- Bottom user card --- */
   .sb-user-card {
-    margin-top: auto;
-    margin: 12px 12px 14px;
-    padding: 10px 12px;
-    border-radius: 14px;
+    margin: auto 12px 14px;
+    padding: 11px 14px;
+    border-radius: 16px;
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
@@ -264,44 +293,41 @@
     transform: translateY(-1px);
   }
   .sb-user-avatar {
-    width: 36px; height: 36px;
+    width: 38px; height: 38px;
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.18);
   }
   .sb-user-meta { flex: 1; min-width: 0; }
   .sb-user-name {
-    font-size: 13px;
-    font-weight: 500;
+    font-size: 13.5px;
+    font-weight: 600;
     color: white;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .sb-user-tier {
-    font-size: 11px;
+    font-size: 10.5px;
     color: rgba(255, 255, 255, 0.5);
-    margin-top: 1px;
+    margin-top: 2px;
+    letter-spacing: 0.02em;
   }
 
-  /* --- Hide login screen sidebar (only show after auth) --- */
+  /* Hide sidebar before login */
   body:not(.is-authed) .desktop-sidebar { display: none; }
 
-  /* --- Inner screens fill the remaining space, no longer clamped to 430px --- */
+  /* Inner screens fill remaining space, no longer clamped to 430px */
   .screen,
   .screen-stranger {
     bottom: 0;
   }
-
-  /* On desktop, conv input doesn't need bottom padding for nav */
   #screenConv .input-wrap { padding-bottom: 14px; }
-
-  /* Login screen: keep the centered card; hide ambient on top */
   #screenLogin { z-index: 60; }
 }
 
-/* Larger screens: cap a bit so chat list and conv don't stretch absurdly wide */
+/* Larger screens: cap content width */
 @media (min-width: 1280px) {
   .app {
     max-width: 1100px;
