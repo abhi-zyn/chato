@@ -1,0 +1,18 @@
+#!/bin/sh
+# Pre-commit hook: update version.json with current commit info
+# Install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+# Get next commit's parent SHA (this commit's parent), use short SHA + timestamp
+SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "init")
+TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+# Generate version.json
+cat > version.json <<EOF
+{
+  "version": "${SHA}-$(date +%s)",
+  "deployed": "${TS}"
+}
+EOF
+
+# Stage version.json so it's part of this commit
+git add version.json
