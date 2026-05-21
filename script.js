@@ -259,6 +259,18 @@ setupChatListDelegation();
 // Also retry after DOM may have new content
 document.addEventListener('DOMContentLoaded', setupChatListDelegation);
 
+// GLOBAL capture — catches clicks even if something else is intercepting them
+// Uses capture phase to run BEFORE other handlers
+document.addEventListener('click', (e) => {
+  const card = e.target.closest('.chat-card');
+  if (card && card._chatData && !card._opening) {
+    card._opening = true;
+    setTimeout(() => { card._opening = false; }, 500); // debounce
+    const d = card._chatData;
+    openChat(d.id, d.other, d.isStranger);
+  }
+}, true);
+
 // ---------- conversation ----------
 async function openChat(chatId, otherProfile, isStranger) {
   let other = otherProfile;

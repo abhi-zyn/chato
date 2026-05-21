@@ -403,8 +403,29 @@
   }
   #screenConv.active {
     display: flex !important;
+    animation: convSlideIn 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   }
   #screenConv .back-btn { display: none; }
+  
+  @keyframes convSlideIn {
+    0% {
+      opacity: 0;
+      transform: translateX(20px) scale(0.98);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0) scale(1);
+    }
+  }
+  
+  /* Animate messages appearing as the chat opens */
+  #screenConv.active .messages > * {
+    animation: msgFadeIn 0.4s ease-out backwards;
+  }
+  @keyframes msgFadeIn {
+    0% { opacity: 0; transform: translateY(8px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
 
   /* Empty conversation placeholder */
   .desktop-conv-empty {
