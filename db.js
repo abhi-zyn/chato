@@ -2,14 +2,8 @@
 window.PopChatsDB = (function () {
   function client() { return window.sb; }
 
-  async function uid() {
-    const { data } = await client().auth.getUser();
-    return data.user ? data.user.id : null;
-  }
-
-  // ---------- profiles ----------
-  function getSessionTokenSync() {
-    // Read session directly from localStorage to bypass any client lock
+  // Read session directly from localStorage to bypass supabase-js auth lock
+  function getSessionSync() {
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
@@ -17,17 +11,60 @@ window.PopChatsDB = (function () {
           const raw = localStorage.getItem(k);
           if (!raw) continue;
           const parsed = JSON.parse(raw);
-          // Could be { access_token, ... } or { currentSession: { access_token, ... } }
-          if (parsed.access_token) return parsed.access_token;
-          if (parsed.currentSession && parsed.currentSession.access_token) {
-            return parsed.currentSession.access_token;
-          }
+          if (parsed.access_token) return parsed;
+          if (parsed.currentSession) return parsed.currentSession;
         }
       }
     } catch (e) {}
     return null;
   }
 
+  function getSessionTokenSync() {
+    const s = getSessionSync();
+    return s ? s.access_token : null;
+  }
+
+  function getUserIdSync() {
+    const s = getSessionSync();
+    return s && s.user ? s.user.id : null;
+  }
+
+  // Direct fetch helper - bypasses supabase-js client lock issues
+  async function rawSelect(table, query) {
+    const token = getSessionTokenSync();
+    if (!token) return { data: null, error: new Error('no session') };
+    try {
+      const url = `${window.SUPABASE_URL}/rest/v1/${table}?${query}`;
+      const res = await fetch(url, {
+        headers: {
+          'apikey': window.SUPABASE_PUBLISHABLE_KEY,
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+      if (!res.ok) {
+        return { data: null, error: new Error(`HTTP ${res.status}`) };
+      }
+      return { data: await res.json(), error: null };
+    } catch (e) {
+      return { data: null, error: e };
+    }
+  }
+
+  async function uid() {
+    // Prefer sync read from localStorage (no lock contention)
+    const syncId = getUserIdSync();
+    if (syncId) return syncId;
+    // Fallback to client (slow path)
+    try {
+      const { data } = await client().auth.getUser();
+      return data.user ? data.user.id : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // ---------- profiles ----------
   async function getMyProfile(userId) {
     const id = userId || await uid(); 
     if (!id) return null;
