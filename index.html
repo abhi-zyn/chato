@@ -30,13 +30,13 @@
       }
       if (hasOAuth) document.documentElement.classList.add('oauth-callback');
       if (hasSavedSession) document.documentElement.classList.add('has-session');
-      // Hard safety: force-hide splash after 8 seconds no matter what
+      // Hard safety: force-hide splash after 6 seconds no matter what
       setTimeout(function () {
         document.documentElement.classList.remove('is-loading');
         document.documentElement.classList.remove('oauth-callback');
         document.documentElement.classList.remove('has-session');
         document.body && document.body.classList.remove('oauth-splash-on');
-      }, 8000);
+      }, 6000);
     } catch (e) {}
   })();
 </script>

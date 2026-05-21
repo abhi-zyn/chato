@@ -1337,7 +1337,7 @@ function closeFriendSheet() {
 }
 
 // ---------- Boot / auth gate ----------
-let bootingAuthed = false;
+let bootingAuthed = false; // false | Promise<void> while a boot is in flight
 
 function withTimeout(promise, ms, label) {
   return Promise.race([
@@ -1348,59 +1348,69 @@ function withTimeout(promise, ms, label) {
 }
 
 async function bootAuthed(user) {
-  if (bootingAuthed) {
-    showScreen('chats', 'chats');
-    return;
-  }
-  bootingAuthed = true;
-  try {
+  if (bootingAuthed) return bootingAuthed;
+  // bootingAuthed holds the in-flight promise so concurrent callers can await it
+  bootingAuthed = (async () => {
     try {
-      me = await withTimeout(PopChatsDB.getMyProfile(), 8000, 'getMyProfile');
-    } catch (e) { console.error('getMyProfile failed:', e); me = null; }
+      // 1) Render chats screen immediately under the splash so the moment splash hides,
+      //    the user sees a populated UI instead of a blank flash.
+      showScreen('chats', 'chats');
 
-    if (!me) {
-      const fallbackUsername = ((user && user.email) || 'user_' + Date.now()).split('@')[0]
-        .replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 24);
-      try {
-        me = await withTimeout(
-          PopChatsDB.upsertMyProfile({ username: fallbackUsername, display_name: fallbackUsername }),
-          8000, 'upsertMyProfile');
-      } catch (e) { console.error('profile init failed', e); }
+      // 2) Kick off profile + chat list in PARALLEL (both are independent reads)
+      const profilePromise = withTimeout(PopChatsDB.getMyProfile(), 5000, 'getMyProfile')
+        .catch(e => { console.error('getMyProfile failed:', e); return null; });
+      const chatsRenderPromise = loadChatList().catch(e => console.error('loadChatList:', e));
+
+      me = await profilePromise;
+
+      if (!me) {
+        const fallbackUsername = ((user && user.email) || 'user_' + Date.now()).split('@')[0]
+          .replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 24);
+        try {
+          me = await withTimeout(
+            PopChatsDB.upsertMyProfile({ username: fallbackUsername, display_name: fallbackUsername }),
+            5000, 'upsertMyProfile');
+        } catch (e) { console.error('profile init failed', e); }
+      }
+
+      // 3) Theme + profile rendering depends on `me`
+      applyTheme(localStorage.getItem(THEME_STORAGE_KEY) || (me && me.theme) || 'ocean', false);
+      refreshProfileScreen();
+
+      // 4) Wait for the chat list paint so splash hides on a fully-rendered screen
+      await chatsRenderPromise;
+
+      // 5) Fire-and-forget non-critical work (don't block splash)
+      PopChatsDB.markOnline(true).catch(() => {});
+      refreshRequestsBadge().catch(() => {});
+      if (friendActivitySub) { PopChatsDB.unsubscribe(friendActivitySub); friendActivitySub = null; }
+      if (me && me.id) {
+        friendActivitySub = PopChatsDB.subscribeToFriendActivity({
+          userId: me.id,
+          handler: () => {
+            refreshRequestsBadge();
+            const sReq = document.getElementById('screenRequests');
+            if (sReq && sReq.classList.contains('active')) loadRequestsScreen();
+            if (activeChat) refreshConvFriendGate();
+            loadChatList();
+          }
+        });
+      }
+      if (me && !me.onboarded) openOnboardingModal(user);
+    } catch (e) {
+      console.error('bootAuthed error', e);
+      showScreen('chats', 'chats');
+    } finally {
+      // Reset on next tick so a SIGNED_IN that fires right now still resolves
+      setTimeout(() => { bootingAuthed = false; }, 0);
     }
-    PopChatsDB.markOnline(true).catch(e => console.error(e));
-    applyTheme(localStorage.getItem(THEME_STORAGE_KEY) || (me && me.theme) || 'ocean', false);
-    showScreen('chats', 'chats');
-    loadChatList().catch(e => console.error('loadChatList:', e));
-    refreshProfileScreen();
-    refreshRequestsBadge().catch(() => {});
-    // Realtime: friend activity
-    if (friendActivitySub) { PopChatsDB.unsubscribe(friendActivitySub); friendActivitySub = null; }
-    if (me && me.id) {
-      friendActivitySub = PopChatsDB.subscribeToFriendActivity({
-        userId: me.id,
-        handler: () => {
-          refreshRequestsBadge();
-          // If on requests screen, reload list
-          const sReq = document.getElementById('screenRequests');
-          if (sReq && sReq.classList.contains('active')) loadRequestsScreen();
-          // If a chat is open, recompute friendship gate
-          if (activeChat) refreshConvFriendGate();
-          // Chat list: a freshly accepted friend creates a chat
-          loadChatList();
-        }
-      });
-    }
-    if (me && !me.onboarded) openOnboardingModal(user);
-  } catch (e) {
-    console.error('bootAuthed error', e);
-    showScreen('chats', 'chats');
-  } finally {
-    bootingAuthed = false;
-  }
+  })();
+  return bootingAuthed;
 }
 
 function bootUnauthed() {
   me = null;
+  bootingAuthed = false;
   if (messageSub) { PopChatsDB.unsubscribe(messageSub); messageSub = null; }
   if (friendActivitySub) { PopChatsDB.unsubscribe(friendActivitySub); friendActivitySub = null; }
   setRequestsBadge(0);
@@ -1678,15 +1688,15 @@ function bootUnauthed() {
     }
   });
 
-  // Auth state
+  // Auth state — INITIAL_SESSION is handled explicitly below to avoid double-boot.
   PopChatsAuth.onAuthChange(async (event, session) => {
-    if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+    if (event === 'INITIAL_SESSION') return;
+    if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
       if (session) await bootAuthed(session.user); else bootUnauthed();
     } else if (event === 'SIGNED_OUT') {
       bootUnauthed();
-    } else if (event === 'PASSWORD_RECOVERY') {
-      // Reset flow lives on reset.html; ignore here.
     }
+    // PASSWORD_RECOVERY → reset.html handles it
   });
 
   // Handle OAuth callback (?code=...) — show splash, run PKCE exchange
