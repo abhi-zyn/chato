@@ -89,6 +89,87 @@ window.PopChatsDB = (function () {
     return !!data;
   }
 
+  // ---------- friendships ----------
+  async function friendshipState(otherId) {
+    const id = await uid(); if (!id || id === otherId) return 'self';
+    const { data, error } = await client().rpc('friendship_state', { other: otherId });
+    if (error) { console.error('[friendshipState]', error); return 'none'; }
+    return data || 'none';
+  }
+
+  // Returns { uid: 'none' | 'outgoing' | 'incoming' | 'friends' | 'declined' | 'blocked' | 'self' }
+  async function friendshipStatesFor(otherIds) {
+    if (!otherIds || !otherIds.length) return {};
+    const { data, error } = await client().rpc('friendship_states_for', { other_ids: otherIds });
+    if (error) { console.error('[friendshipStatesFor]', error); return {}; }
+    const out = {};
+    (data || []).forEach(r => { out[r.other_id] = r.state; });
+    return out;
+  }
+
+  async function sendFriendRequest(otherId) {
+    const { data, error } = await client().rpc('send_friend_request', { other: otherId });
+    if (error) throw error;
+    return data; // 'pending' | 'friends'
+  }
+
+  async function acceptFriendRequest(otherId) {
+    const { data, error } = await client().rpc('accept_friend_request', { other: otherId });
+    if (error) throw error;
+    return data; // chat_id
+  }
+
+  async function declineFriendRequest(otherId) {
+    const { error } = await client().rpc('decline_friend_request', { other: otherId });
+    if (error) throw error;
+  }
+
+  async function cancelFriendRequest(otherId) {
+    const { error } = await client().rpc('cancel_friend_request', { other: otherId });
+    if (error) throw error;
+  }
+
+  async function unfriend(otherId) {
+    const { error } = await client().rpc('unfriend', { other: otherId });
+    if (error) throw error;
+  }
+
+  async function listFriendRequests() {
+    const { data, error } = await client().rpc('list_friend_requests');
+    if (error) { console.error('[listFriendRequests]', error); return []; }
+    return data || [];
+  }
+
+  async function listFriends() {
+    const { data, error } = await client().rpc('list_friends');
+    if (error) { console.error('[listFriends]', error); return []; }
+    return data || [];
+  }
+
+  async function friendSince(otherId) {
+    const { data, error } = await client().rpc('friend_since', { other: otherId });
+    if (error) { console.error('[friendSince]', error); return null; }
+    return data || null;
+  }
+
+  // Realtime: friend-request inbox + accepted notifications
+  function subscribeToFriendActivity(onChange) {
+    const id = (typeof onChange === 'object' ? onChange.userId : null);
+    const handler = (typeof onChange === 'function' ? onChange : onChange.handler);
+    const ch = client()
+      .channel('friend-activity')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' },
+          (payload) => handler && handler(payload))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications',
+                                filter: id ? ('user_id=eq.' + id) : undefined },
+          (payload) => {
+            const k = payload.new && payload.new.kind;
+            if (k === 'friend_request' || k === 'friend_accepted') handler && handler(payload);
+          })
+      .subscribe();
+    return ch;
+  }
+
   // ---------- chats ----------
   async function listMyChats() {
     const id = await uid(); if (!id) return [];
@@ -242,6 +323,11 @@ window.PopChatsDB = (function () {
     getMyProfile, upsertMyProfile, updateMyProfile, getProfile,
     searchProfiles, markOnline, countOnline,
     uploadAvatar, isUsernameAvailable, emailExists,
+    friendshipState, friendshipStatesFor,
+    sendFriendRequest, acceptFriendRequest, declineFriendRequest,
+    cancelFriendRequest, unfriend,
+    listFriendRequests, listFriends, friendSince,
+    subscribeToFriendActivity,
     listMyChats, getChatMembers,
     getOrCreateDM, startStrangerChat, pickRandomStranger,
     listMessages, sendMessage, subscribeToChat, unsubscribe,

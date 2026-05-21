@@ -25,6 +25,9 @@ const chatList = document.getElementById('chatList');
 let me = null;          // current profile row from public.profiles
 let activeChat = null;  // { id, other }
 let messageSub = null;  // realtime channel for active chat
+let friendActivitySub = null;  // realtime channel for friend requests
+let pendingRequestCount = 0;   // incoming pending requests, for badge
+let activeRequestTab = 'incoming';
 
 // ---------- helpers ----------
 const AVATAR_FALLBACK = 'https://api.dicebear.com/7.x/initials/svg?seed=';
@@ -128,7 +131,8 @@ function showScreen(name, navView) {
 
   if (isDesktop && name === 'conv') {
     // Desktop: keep chat list visible, show conv alongside
-    [sProfile, sSettings, sNotifications, sCalls].forEach(s => s && s.classList.remove('active'));
+    const sRequests = document.getElementById('screenRequests');
+    [sProfile, sSettings, sNotifications, sCalls, sRequests].forEach(s => s && s.classList.remove('active'));
     sConv.classList.add('active');
     document.body.classList.add('desktop-conv-open');
     document.body.classList.remove('show-other-screen');
@@ -138,14 +142,16 @@ function showScreen(name, navView) {
   }
 
   // Remove active from all screens
-  [sLogin, sChats, sConv, sProfile, sSettings, sNotifications, sCalls]
+  const sRequests = document.getElementById('screenRequests');
+  [sLogin, sChats, sConv, sProfile, sSettings, sNotifications, sCalls, sRequests]
     .forEach(s => s && s.classList.remove('active'));
   const map = { login:sLogin, chats:sChats, conv:sConv, profile:sProfile,
-                settings:sSettings, notifications:sNotifications, calls:sCalls };
+                settings:sSettings, notifications:sNotifications, calls:sCalls,
+                requests: sRequests };
   if (map[name]) map[name].classList.add('active');
   if (navView) setNavActive(navView);
   const nav = document.querySelector('.bottom-nav');
-  const hideNavOn = ['login', 'conv'];
+  const hideNavOn = ['login', 'conv', 'requests'];
   if (nav) nav.style.display = hideNavOn.includes(name) ? 'none' : 'flex';
   document.body.classList.toggle('is-authed', name !== 'login');
   document.body.classList.remove('desktop-conv-open');
@@ -185,20 +191,20 @@ async function loadChatList() {
         `<div class="chat-sub">${sub}</div>` +
       `</div>` +
       `<div class="chat-meta">${dot}</div>`;
-    card.addEventListener('click', () => openChat(c.id, other));
+    card.addEventListener('click', () => openChat(c.id, other, c.is_stranger));
     chatList.appendChild(card);
     setTimeout(() => card.classList.add('show'), i * 60);
   });
 }
 
 // ---------- conversation ----------
-async function openChat(chatId, otherProfile) {
+async function openChat(chatId, otherProfile, isStranger) {
   let other = otherProfile;
   if (!other) {
     const members = await PopChatsDB.getChatMembers(chatId);
     other = members.find(m => m.id !== (me && me.id)) || null;
   }
-  activeChat = { id: chatId, other };
+  activeChat = { id: chatId, other, isStranger: !!isStranger, friendState: 'none' };
   convAv.src = avatarOf(other);
   convAv.alt = other ? (other.display_name || other.username) : '';
   convNm.textContent = other ? (other.display_name || other.username) : 'Unknown';
@@ -207,6 +213,81 @@ async function openChat(chatId, otherProfile) {
   await renderMessages(chatId);
   if (messageSub) { PopChatsDB.unsubscribe(messageSub); messageSub = null; }
   messageSub = PopChatsDB.subscribeToChat(chatId, (m) => appendMessage(m));
+
+  // Determine friendship state to gate input and show banner
+  await refreshConvFriendGate();
+}
+
+async function refreshConvFriendGate() {
+  const banner = document.getElementById('convBanner');
+  if (!activeChat || !activeChat.other || activeChat.isStranger) {
+    if (banner) banner.hidden = true;
+    setSendDisabled(false);
+    return;
+  }
+  const other = activeChat.other;
+  const state = await PopChatsDB.friendshipState(other.id);
+  activeChat.friendState = state;
+
+  // Stranger chats are not friend-gated
+  // We don't have is_stranger here; infer from chat list or assume DM
+  // Friends can chat freely
+  if (state === 'friends' || state === 'self') {
+    if (banner) banner.hidden = true;
+    setSendDisabled(false);
+    return;
+  }
+
+  // Render banner based on state
+  if (banner) {
+    let html = '';
+    if (state === 'incoming') {
+      html =
+        `<div class="conv-banner-text">${escapeHtml(other.display_name || other.username)} sent you a friend request.</div>` +
+        `<div class="conv-banner-actions">` +
+          `<button class="btn-ghost" data-act="decline">Decline</button>` +
+          `<button class="btn-primary" data-act="accept">Accept</button>` +
+        `</div>`;
+    } else if (state === 'outgoing') {
+      html =
+        `<div class="conv-banner-text">Friend request sent. You can chat once it's accepted.</div>` +
+        `<div class="conv-banner-actions">` +
+          `<button class="btn-ghost" data-act="cancel">Cancel request</button>` +
+        `</div>`;
+    } else if (state === 'blocked') {
+      html = `<div class="conv-banner-text">You can't message this person.</div>`;
+    } else {
+      html =
+        `<div class="conv-banner-text">Send a friend request to start chatting.</div>` +
+        `<div class="conv-banner-actions">` +
+          `<button class="btn-primary" data-act="add">Add friend</button>` +
+        `</div>`;
+    }
+    banner.innerHTML = html;
+    banner.hidden = false;
+    banner.querySelectorAll('button[data-act]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const act = btn.dataset.act;
+        try {
+          if (act === 'add')      await PopChatsDB.sendFriendRequest(other.id);
+          if (act === 'cancel')   await PopChatsDB.cancelFriendRequest(other.id);
+          if (act === 'accept')   await PopChatsDB.acceptFriendRequest(other.id);
+          if (act === 'decline')  await PopChatsDB.declineFriendRequest(other.id);
+          await refreshConvFriendGate();
+          if (act === 'accept' || act === 'add') loadChatList();
+        } catch (e) { toast(e.message || 'Action failed'); }
+      });
+    });
+  }
+  setSendDisabled(true);
+}
+
+function setSendDisabled(disabled) {
+  if (sendBtn) sendBtn.disabled = !!disabled;
+  if (msgInput) {
+    msgInput.disabled = !!disabled;
+    msgInput.placeholder = disabled ? 'You need to be friends to chat…' : 'Type your message...';
+  }
 }
 
 async function renderMessages(chatId) {
@@ -233,6 +314,11 @@ function appendMessage(m, animate = true, idx = 0) {
 async function sendMsg() {
   const txt = msgInput.value.trim();
   if (!txt || !activeChat) return;
+  // Hard guard: if input is disabled (non-friend / non-stranger), don't send
+  if (msgInput.disabled || (sendBtn && sendBtn.disabled)) {
+    toast('You need to be friends to send messages.');
+    return;
+  }
   msgInput.value = '';
 
   // Optimistic local echo with pop animation
@@ -286,30 +372,83 @@ async function searchUser() {
     modalResult.innerHTML = '<p class="result-msg">No user found. Try another username.</p>';
     return;
   }
-  modalResult.innerHTML = filtered.slice(0, 5).map(u =>
-    `<div class="result-card">
+  const states = await PopChatsDB.friendshipStatesFor(filtered.slice(0, 5).map(u => u.id));
+  modalResult.innerHTML = filtered.slice(0, 5).map(u => {
+    const st = states[u.id] || 'none';
+    return `<div class="result-card" data-uid="${u.id}">
       <div class="result-avatar"><img src="${avatarOf(u)}" alt=""/></div>
       <div class="result-info">
         <div class="result-name">${escapeHtml(u.display_name || u.username)}</div>
         <div class="result-handle">@${escapeHtml(u.username)}</div>
       </div>
-      <button class="result-start-btn" data-uid="${u.id}">Chat</button>
-    </div>`
-  ).join('');
-  modalResult.querySelectorAll('.result-start-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const uid = btn.dataset.uid;
-      const other = filtered.find(x => x.id === uid);
-      try {
-        const chatId = await PopChatsDB.getOrCreateDM(uid);
-        closeModal();
-        await loadChatList();
-        openChat(chatId, other);
-      } catch (e) {
-        toast('Could not start chat: ' + (e.message || 'error'));
-      }
-    });
+      ${friendActionButtonHTML(st)}
+    </div>`;
+  }).join('');
+  modalResult.querySelectorAll('.result-card').forEach(card => {
+    const uid = card.dataset.uid;
+    const u = filtered.find(x => x.id === uid);
+    card.querySelectorAll('button[data-friend-act]').forEach(btn =>
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handleFriendAction(btn.dataset.friendAct, u, async () => {
+          // Re-render this row only
+          const newState = await PopChatsDB.friendshipState(uid);
+          card.querySelector('.result-action-slot').outerHTML = friendActionButtonHTML(newState);
+          // Re-bind
+          card.querySelectorAll('button[data-friend-act]').forEach(nb =>
+            nb.addEventListener('click', (ev) => {
+              ev.stopPropagation();
+              handleFriendAction(nb.dataset.friendAct, u, () => searchUser());
+            }));
+        });
+      }));
   });
+}
+
+// Renders the action area for a user given a friendship state
+function friendActionButtonHTML(state) {
+  if (state === 'friends') {
+    return `<div class="result-action-slot"><button class="result-start-btn" data-friend-act="message">Message</button></div>`;
+  }
+  if (state === 'outgoing') {
+    return `<div class="result-action-slot"><button class="result-start-btn ghost" data-friend-act="cancel">Requested</button></div>`;
+  }
+  if (state === 'incoming') {
+    return `<div class="result-action-slot">
+      <button class="result-start-btn ghost" data-friend-act="decline">Decline</button>
+      <button class="result-start-btn" data-friend-act="accept">Accept</button>
+    </div>`;
+  }
+  if (state === 'blocked' || state === 'self') {
+    return `<div class="result-action-slot"></div>`;
+  }
+  return `<div class="result-action-slot"><button class="result-start-btn" data-friend-act="add">Add Friend</button></div>`;
+}
+
+async function handleFriendAction(action, user, onDone) {
+  try {
+    if (action === 'add')     { await PopChatsDB.sendFriendRequest(user.id);    toast('Friend request sent'); }
+    if (action === 'cancel')  { await PopChatsDB.cancelFriendRequest(user.id);  toast('Request cancelled'); }
+    if (action === 'decline') { await PopChatsDB.declineFriendRequest(user.id); toast('Declined'); }
+    if (action === 'accept')  {
+      const chatId = await PopChatsDB.acceptFriendRequest(user.id);
+      toast("You're now friends with @" + (user.username || ''));
+      closeModal();
+      await loadChatList();
+      openChat(chatId, user, false);
+      return;
+    }
+    if (action === 'message') {
+      const chatId = await PopChatsDB.getOrCreateDM(user.id);
+      closeModal();
+      await loadChatList();
+      openChat(chatId, user, false);
+      return;
+    }
+    if (typeof onDone === 'function') await onDone();
+  } catch (e) {
+    toast(e.message || 'Action failed');
+  }
 }
 
 // ---------- Stranger chat ----------
@@ -348,7 +487,7 @@ async function startStrangerMatch() {
       setTimeout(async () => {
         screenStranger.classList.remove('active');
         await loadChatList();
-        openChat(chatId, stranger);
+        openChat(chatId, stranger, true);
       }, 900);
     } catch (e) {
       strangerStatus.textContent = 'Error';
@@ -840,16 +979,20 @@ async function runChatsSearch(q) {
     html += matchedChats.map(c => renderChatRow(c)).join('');
   }
   if (newUsers.length) {
+    const states = await PopChatsDB.friendshipStatesFor(newUsers.slice(0, 10).map(u => u.id));
     html += '<div class="search-section-label">People</div>';
-    html += newUsers.slice(0, 10).map(u => `
+    html += newUsers.slice(0, 10).map(u => {
+      const st = states[u.id] || 'none';
+      return `
       <div class="chat-item" data-newuid="${u.id}">
         <div class="chat-avatar"><img src="${avatarOf(u)}" alt=""/></div>
         <div class="chat-info">
           <div class="chat-name">${escapeHtml(u.full_name || u.display_name || u.username)}</div>
           <div class="chat-last">@${escapeHtml(u.username)}</div>
         </div>
-        <div class="chat-meta"><div class="chat-start-pill">Start</div></div>
-      </div>`).join('');
+        <div class="chat-meta">${friendActionButtonHTML(st)}</div>
+      </div>`;
+    }).join('');
   }
   if (!html) {
     chatList.innerHTML =
@@ -859,18 +1002,21 @@ async function runChatsSearch(q) {
   }
   chatList.innerHTML = html;
 
-  // Wire new-user rows
+  // Wire new-user rows: row click is a no-op when there's a button; friend action buttons handle their own clicks
+  chatList.querySelectorAll('[data-newuid] button[data-friend-act]').forEach(btn => {
+    const row = btn.closest('[data-newuid]');
+    const uid = row && row.dataset.newuid;
+    const profile = newUsers.find(u => u.id === uid);
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleFriendAction(btn.dataset.friendAct, profile, () => runChatsSearch(q));
+    });
+  });
   chatList.querySelectorAll('[data-newuid]').forEach(el => {
-    el.addEventListener('click', async () => {
+    el.addEventListener('click', () => {
       const uid = el.dataset.newuid;
       const profile = newUsers.find(u => u.id === uid);
-      try {
-        const chatId = await PopChatsDB.getOrCreateDM(uid);
-        await loadChatList();
-        openChat(chatId, profile);
-      } catch (e) {
-        toast('Could not start chat: ' + (e.message || 'error'));
-      }
+      if (profile) openFriendSheet(profile);
     });
   });
 }
@@ -943,6 +1089,253 @@ async function loadCallsScreen() {
   }).join('');
 }
 
+// ---------- Friend requests screen ----------
+function setRequestsBadge(n) {
+  pendingRequestCount = n || 0;
+  const badge = document.getElementById('requestsBadge');
+  if (!badge) return;
+  if (pendingRequestCount > 0) {
+    badge.textContent = pendingRequestCount > 99 ? '99+' : String(pendingRequestCount);
+    badge.hidden = false;
+  } else {
+    badge.hidden = true;
+  }
+}
+
+async function loadRequestsScreen() {
+  const container = document.getElementById('requestsList');
+  if (!container) return;
+  container.innerHTML = '<div style="padding:24px;text-align:center;color:#9a9488;font-size:13px;">Loading…</div>';
+  const items = await PopChatsDB.listFriendRequests();
+  const incoming = items.filter(x => x.direction === 'incoming');
+  const outgoing = items.filter(x => x.direction === 'outgoing');
+  setRequestsBadge(incoming.length);
+  document.getElementById('reqInCount').textContent  = incoming.length;
+  document.getElementById('reqOutCount').textContent = outgoing.length;
+
+  const list = activeRequestTab === 'incoming' ? incoming : outgoing;
+  if (!list.length) {
+    container.innerHTML =
+      '<div style="padding:30px;text-align:center;color:#9a9488;font-size:13px;line-height:1.6;">' +
+      (activeRequestTab === 'incoming'
+        ? 'No incoming requests.<br/>When someone wants to be your friend, they\'ll show up here.'
+        : 'No pending sent requests.') +
+      '</div>';
+    return;
+  }
+
+  container.innerHTML = list.map(r => {
+    const name = escapeHtml(r.full_name || r.display_name || r.username);
+    const avatar = r.avatar_url || (AVATAR_FALLBACK + encodeURIComponent(r.display_name || r.username || '?'));
+    const actions = activeRequestTab === 'incoming'
+      ? `<button class="req-btn ghost" data-act="decline" data-uid="${r.other_id}">Decline</button>
+         <button class="req-btn primary" data-act="accept" data-uid="${r.other_id}">Accept</button>`
+      : `<button class="req-btn ghost" data-act="cancel" data-uid="${r.other_id}">Cancel</button>`;
+    return `
+      <div class="req-card" data-uid="${r.other_id}">
+        <div class="req-avatar"><img src="${avatar}" alt=""/></div>
+        <div class="req-info">
+          <div class="req-name">${name}</div>
+          <div class="req-handle">@${escapeHtml(r.username)}</div>
+          ${r.bio ? `<div class="req-bio">${escapeHtml(r.bio)}</div>` : ''}
+        </div>
+        <div class="req-actions">${actions}</div>
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('.req-card').forEach(card => {
+    const uid = card.dataset.uid;
+    const profile = list.find(x => x.other_id === uid);
+    // Tap card body opens friend profile sheet
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      openFriendSheet({
+        id: uid,
+        username: profile.username,
+        display_name: profile.display_name,
+        full_name: profile.full_name,
+        avatar_url: profile.avatar_url,
+        bio: profile.bio
+      });
+    });
+    card.querySelectorAll('button[data-act]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const act = btn.dataset.act;
+        try {
+          if (act === 'accept')  {
+            const chatId = await PopChatsDB.acceptFriendRequest(uid);
+            toast("You're now friends with @" + (profile.username || ''));
+            // animate row out
+            card.style.transition = 'opacity .25s, transform .25s';
+            card.style.opacity = '0';
+            card.style.transform = 'translateX(20px)';
+            setTimeout(async () => {
+              await loadRequestsScreen();
+              await loadChatList();
+            }, 250);
+            return;
+          }
+          if (act === 'decline') {
+            await PopChatsDB.declineFriendRequest(uid);
+            await loadRequestsScreen();
+            return;
+          }
+          if (act === 'cancel') {
+            await PopChatsDB.cancelFriendRequest(uid);
+            await loadRequestsScreen();
+            return;
+          }
+        } catch (err) { toast(err.message || 'Action failed'); }
+      });
+    });
+  });
+}
+
+async function refreshRequestsBadge() {
+  try {
+    const items = await PopChatsDB.listFriendRequests();
+    const incoming = items.filter(x => x.direction === 'incoming').length;
+    setRequestsBadge(incoming);
+  } catch (_) {}
+}
+
+// ---------- Friend Profile Sheet ----------
+function openFriendSheet(profile) {
+  const sheet = document.getElementById('friendSheet');
+  if (!sheet || !profile) return;
+  sheet.dataset.uid = profile.id || '';
+  document.getElementById('friendSheetAvatar').src = avatarOf(profile);
+  document.getElementById('friendSheetName').textContent =
+    profile.full_name || profile.display_name || profile.username || 'Unknown';
+  document.getElementById('friendSheetHandle').textContent = '@' + (profile.username || '');
+  const bioEl = document.getElementById('friendSheetBio');
+  if (profile.bio && profile.bio.trim()) {
+    bioEl.textContent = profile.bio;
+    bioEl.hidden = false;
+  } else {
+    bioEl.hidden = true;
+  }
+  // Reset meta + list while loading
+  document.getElementById('friendSheetMeta').innerHTML = '';
+  document.getElementById('friendSheetList').innerHTML = '';
+  sheet.classList.add('open');
+  document.body.classList.add('modal-open');
+
+  // Load full profile + state asynchronously
+  hydrateFriendSheet(profile.id);
+}
+
+async function hydrateFriendSheet(userId) {
+  const [full, state] = await Promise.all([
+    PopChatsDB.getProfile(userId),
+    PopChatsDB.friendshipState(userId)
+  ]);
+  if (full) {
+    document.getElementById('friendSheetAvatar').src = avatarOf(full);
+    document.getElementById('friendSheetName').textContent =
+      full.full_name || full.display_name || full.username || 'Unknown';
+    document.getElementById('friendSheetHandle').textContent = '@' + (full.username || '');
+    const bioEl = document.getElementById('friendSheetBio');
+    if (full.bio && full.bio.trim()) { bioEl.textContent = full.bio; bioEl.hidden = false; }
+    else { bioEl.hidden = true; }
+  }
+
+  // Meta chips
+  const metaEl = document.getElementById('friendSheetMeta');
+  const chips = [];
+  if (full && full.online) chips.push(`<div class="fs-chip"><span class="fs-dot"></span>Online</div>`);
+  if (state === 'friends') {
+    const since = await PopChatsDB.friendSince(userId);
+    if (since) {
+      const d = new Date(since);
+      const fmt = d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+      chips.push(`<div class="fs-chip">Friends since ${fmt}</div>`);
+    } else {
+      chips.push(`<div class="fs-chip">Friends</div>`);
+    }
+  } else if (state === 'outgoing') {
+    chips.push(`<div class="fs-chip">Request sent</div>`);
+  } else if (state === 'incoming') {
+    chips.push(`<div class="fs-chip">Wants to be friends</div>`);
+  }
+  metaEl.innerHTML = chips.join('');
+
+  // Action buttons enabled state
+  const isFriend = state === 'friends';
+  document.getElementById('friendSheetMessage').disabled = !isFriend;
+  document.getElementById('friendSheetCall').disabled    = !isFriend;
+  document.getElementById('friendSheetVideo').disabled   = !isFriend;
+
+  // List rows depend on state
+  const listEl = document.getElementById('friendSheetList');
+  let rows = '';
+  if (state === 'friends') {
+    rows += rowHTML('Mute notifications', 'switch', 'mute');
+    rows += rowHTML('Search in conversation', 'chev', 'search');
+    rows += rowHTML('Media, links, docs', 'chev', 'media');
+    rows += rowHTML('Block @' + (full && full.username ? full.username : 'user'), 'danger', 'block');
+    rows += rowHTML('Unfriend', 'danger', 'unfriend');
+  } else if (state === 'outgoing') {
+    rows += rowHTML('Cancel friend request', 'danger', 'cancel');
+  } else if (state === 'incoming') {
+    rows += rowHTML('Accept request', 'primary', 'accept');
+    rows += rowHTML('Decline', 'danger', 'decline');
+  } else if (state === 'blocked') {
+    rows += rowHTML('Unblock', 'primary', 'unblock');
+  } else {
+    rows += rowHTML('Add friend', 'primary', 'add');
+  }
+  listEl.innerHTML = rows;
+
+  listEl.querySelectorAll('button[data-row-act]').forEach(btn => {
+    btn.addEventListener('click', () => handleFriendSheetAction(btn.dataset.rowAct, userId, full));
+  });
+}
+
+function rowHTML(label, kind, act) {
+  const cls = kind === 'danger' ? 'fs-row danger' : (kind === 'primary' ? 'fs-row primary' : 'fs-row');
+  const right = kind === 'switch' ? '<span class="fs-switch"></span>'
+              : kind === 'chev'   ? '<span class="fs-chev">›</span>'
+              : '';
+  return `<button class="${cls}" data-row-act="${act}" type="button">
+    <span class="fs-row-label">${escapeHtml(label)}</span>${right}
+  </button>`;
+}
+
+async function handleFriendSheetAction(act, userId, profile) {
+  try {
+    if (act === 'add')      { await PopChatsDB.sendFriendRequest(userId);   toast('Friend request sent'); }
+    else if (act === 'cancel')   { await PopChatsDB.cancelFriendRequest(userId);  toast('Request cancelled'); }
+    else if (act === 'accept')   {
+      const chatId = await PopChatsDB.acceptFriendRequest(userId);
+      toast("You're now friends");
+      closeFriendSheet();
+      await loadChatList();
+      openChat(chatId, profile, false);
+      return;
+    }
+    else if (act === 'decline')  { await PopChatsDB.declineFriendRequest(userId); toast('Declined'); }
+    else if (act === 'unfriend') {
+      if (!confirm('Remove this friend?')) return;
+      await PopChatsDB.unfriend(userId);
+      toast('Removed');
+    }
+    else if (act === 'block' || act === 'unblock') { toast('Coming soon'); return; }
+    else if (act === 'mute' || act === 'search' || act === 'media') { toast('Coming soon'); return; }
+    await hydrateFriendSheet(userId);
+    if (activeChat && activeChat.other && activeChat.other.id === userId) {
+      await refreshConvFriendGate();
+    }
+  } catch (e) { toast(e.message || 'Action failed'); }
+}
+
+function closeFriendSheet() {
+  const sheet = document.getElementById('friendSheet');
+  if (sheet) sheet.classList.remove('open');
+  document.body.classList.remove('modal-open');
+}
+
 // ---------- Boot / auth gate ----------
 let bootingAuthed = false;
 
@@ -979,6 +1372,24 @@ async function bootAuthed(user) {
     showScreen('chats', 'chats');
     loadChatList().catch(e => console.error('loadChatList:', e));
     refreshProfileScreen();
+    refreshRequestsBadge().catch(() => {});
+    // Realtime: friend activity
+    if (friendActivitySub) { PopChatsDB.unsubscribe(friendActivitySub); friendActivitySub = null; }
+    if (me && me.id) {
+      friendActivitySub = PopChatsDB.subscribeToFriendActivity({
+        userId: me.id,
+        handler: () => {
+          refreshRequestsBadge();
+          // If on requests screen, reload list
+          const sReq = document.getElementById('screenRequests');
+          if (sReq && sReq.classList.contains('active')) loadRequestsScreen();
+          // If a chat is open, recompute friendship gate
+          if (activeChat) refreshConvFriendGate();
+          // Chat list: a freshly accepted friend creates a chat
+          loadChatList();
+        }
+      });
+    }
     if (me && !me.onboarded) openOnboardingModal(user);
   } catch (e) {
     console.error('bootAuthed error', e);
@@ -991,6 +1402,8 @@ async function bootAuthed(user) {
 function bootUnauthed() {
   me = null;
   if (messageSub) { PopChatsDB.unsubscribe(messageSub); messageSub = null; }
+  if (friendActivitySub) { PopChatsDB.unsubscribe(friendActivitySub); friendActivitySub = null; }
+  setRequestsBadge(0);
   showScreen('login');
 }
 
@@ -1016,6 +1429,68 @@ function bootUnauthed() {
     () => showScreen('profile', 'profile'));
   document.getElementById('settingsMenuItem').addEventListener('click',
     () => showScreen('settings'));
+
+  // Friend Requests screen
+  const openReq = document.getElementById('openRequestsBtn');
+  if (openReq) openReq.addEventListener('click', () => {
+    showScreen('requests');
+    activeRequestTab = 'incoming';
+    document.querySelectorAll('.req-tab').forEach(t =>
+      t.classList.toggle('active', t.dataset.rtab === 'incoming'));
+    loadRequestsScreen();
+  });
+  const reqBack = document.getElementById('requestsBackBtn');
+  if (reqBack) reqBack.addEventListener('click', () => showScreen('chats', 'chats'));
+  document.querySelectorAll('.req-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      activeRequestTab = tab.dataset.rtab;
+      document.querySelectorAll('.req-tab').forEach(t =>
+        t.classList.toggle('active', t === tab));
+      loadRequestsScreen();
+    });
+  });
+
+  // Friend profile sheet — open from chat header, close handlers
+  const convFriendBtn = document.getElementById('convFriendBtn');
+  if (convFriendBtn) convFriendBtn.addEventListener('click', () => {
+    if (activeChat && activeChat.other) openFriendSheet(activeChat.other);
+  });
+  const fsClose = document.getElementById('friendSheetClose');
+  if (fsClose) fsClose.addEventListener('click', closeFriendSheet);
+  const fsOverlay = document.getElementById('friendSheet');
+  if (fsOverlay) fsOverlay.addEventListener('click', e => {
+    if (e.target === fsOverlay) closeFriendSheet();
+  });
+  // Sheet action buttons (Message / Audio / Video)
+  const fsMsg = document.getElementById('friendSheetMessage');
+  if (fsMsg) fsMsg.addEventListener('click', async () => {
+    if (fsMsg.disabled) return;
+    if (!activeChat || !activeChat.other) {
+      // Sheet was opened from search; resolve DM
+      const handle = document.getElementById('friendSheetHandle').textContent.replace('@','');
+      // We don't have the user id at hand here without storing it — store it via dataset
+    }
+    // We do have it: friend sheet hydrate stores via dataset
+    const uid = fsOverlay && fsOverlay.dataset.uid;
+    if (!uid) { closeFriendSheet(); return; }
+    try {
+      const chatId = await PopChatsDB.getOrCreateDM(uid);
+      closeFriendSheet();
+      await loadChatList();
+      openChat(chatId, null, false);
+    } catch (e) { toast(e.message || 'Cannot open chat'); }
+  });
+  const fsCall  = document.getElementById('friendSheetCall');
+  const fsVideo = document.getElementById('friendSheetVideo');
+  if (fsCall)  fsCall.addEventListener('click', () => toast('Calls coming soon'));
+  if (fsVideo) fsVideo.addEventListener('click', () => toast('Video coming soon'));
+  // Esc to close sheet
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const s = document.getElementById('friendSheet');
+      if (s && s.classList.contains('open')) closeFriendSheet();
+    }
+  });
 
   // Bottom nav
   document.querySelectorAll('.nav-btn').forEach(b => {

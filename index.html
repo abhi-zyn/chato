@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>PopChats</title>
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="login.css?v=4">
 <link rel="stylesheet" href="desktop.css?v=6">
@@ -126,7 +126,10 @@
     <div class="header">
       <h1>Chats</h1>
       <div class="header-actions">
-        <button class="glass-btn"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></button>
+        <button class="glass-btn" id="openRequestsBtn" type="button" aria-label="Friend requests">
+          <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          <span class="glass-badge" id="requestsBadge" hidden>0</span>
+        </button>
         <button class="glass-btn"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button>
       </div>
     </div>
@@ -145,13 +148,16 @@
   <div class="screen" id="screenConv">
     <div class="conv-header">
       <button class="back-btn" id="backBtn"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
-      <div class="conv-avatar"><img id="convAvatar" src="" alt=""/></div>
-      <div class="conv-title"><h2 id="convName">Name</h2><p id="convStatus">Online</p></div>
+      <button class="conv-friend-btn" id="convFriendBtn" type="button">
+        <div class="conv-avatar"><img id="convAvatar" src="" alt=""/></div>
+        <div class="conv-title"><h2 id="convName">Name</h2><p id="convStatus">Online</p></div>
+      </button>
       <div class="header-actions">
         <button class="glass-btn" style="width:38px;height:38px;border-radius:12px;"><svg viewBox="0 0 24 24" style="width:18px;height:18px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></button>
         <button class="glass-btn" style="width:38px;height:38px;border-radius:12px;"><svg viewBox="0 0 24 24" style="width:18px;height:18px;"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg></button>
       </div>
     </div>
+    <div class="conv-banner" id="convBanner" hidden></div>
     <div class="messages" id="messagesBox"></div>
     <div class="input-wrap">
       <div class="input-bar">
@@ -191,9 +197,9 @@
     <div class="profile-body">
       <div class="profile-card">
         <div class="profile-name-row">
-          <div class="profile-name">Duygu Özarslan</div>
+          <div class="profile-name">PopChats User</div>
         </div>
-        <div class="profile-handle">@elmasokori</div>
+        <div class="profile-handle">@user</div>
         <div class="profile-bio" id="profileBio" style="display:none"></div>
       </div>
       <div class="profile-card" style="padding:10px 20px">
@@ -241,6 +247,22 @@
     <div class="header"><h1>Notifications</h1></div>
     <div class="scroll-area">
       <div class="notif-list"></div>
+    </div>
+  </div>
+
+  <!-- FRIEND REQUESTS -->
+  <div class="screen" id="screenRequests">
+    <div class="status-bar"><span></span></div>
+    <div class="header">
+      <button class="back-btn" id="requestsBackBtn" type="button"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+      <h1 style="margin-left:8px;">Friend requests</h1>
+    </div>
+    <div class="req-tabs">
+      <button class="req-tab active" data-rtab="incoming" type="button">Incoming <span class="req-tab-count" id="reqInCount">0</span></button>
+      <button class="req-tab" data-rtab="outgoing" type="button">Sent <span class="req-tab-count" id="reqOutCount">0</span></button>
+    </div>
+    <div class="scroll-area">
+      <div class="req-list" id="requestsList"></div>
     </div>
   </div>
 
@@ -531,6 +553,42 @@
     </div>
   </div>
 </aside>
+
+<!-- FRIEND PROFILE SHEET -->
+<div class="modal-overlay friend-sheet-overlay" id="friendSheet" style="z-index:1300;">
+  <div class="friend-sheet" role="dialog" aria-modal="true" aria-labelledby="friendSheetName">
+    <div class="modal-handle"></div>
+    <button class="friend-sheet-close" id="friendSheetClose" type="button" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="friend-sheet-hero">
+      <div class="friend-sheet-avatar-ring">
+        <img id="friendSheetAvatar" src="" alt=""/>
+      </div>
+      <h2 id="friendSheetName">—</h2>
+      <p class="friend-sheet-handle" id="friendSheetHandle">@—</p>
+      <p class="friend-sheet-bio" id="friendSheetBio" hidden></p>
+    </div>
+    <div class="friend-sheet-meta" id="friendSheetMeta"></div>
+    <div class="friend-sheet-actions">
+      <button class="fs-action" id="friendSheetMessage" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>Message</span>
+      </button>
+      <button class="fs-action" id="friendSheetCall" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        <span>Audio</span>
+      </button>
+      <button class="fs-action" id="friendSheetVideo" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+        <span>Video</span>
+      </button>
+    </div>
+    <div class="friend-sheet-list" id="friendSheetList">
+      <!-- populated by JS: friendship-state-dependent rows -->
+    </div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>

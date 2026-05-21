@@ -265,3 +265,290 @@ html,body { height:100%; width:100%; overflow:hidden; overscroll-behavior:none; 
 .call-back-btn{width:38px;height:38px;border-radius:12px;border:1px solid rgba(255,255,255,0.22);background:rgba(255,255,255,0.1);backdrop-filter:blur(16px);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;position:relative;z-index:1;transition:all 0.2s ease}
 .call-back-btn:active{transform:scale(0.9)}
 .call-back-btn svg{width:17px;height:17px;stroke:#1a1a1a;stroke-width:2;fill:none}
+
+/* =========================================================
+   PopChats — Liquid Glass tokens + Friend system styles
+   (added by friend-request feature)
+   ========================================================= */
+:root{
+  --glass-1: rgba(255,255,255,0.06);
+  --glass-2: rgba(255,255,255,0.10);
+  --glass-3: rgba(255,255,255,0.16);
+  --glass-stroke: rgba(255,255,255,0.22);
+  --glass-stroke-soft: rgba(255,255,255,0.14);
+  --glass-blur-s: blur(20px) saturate(140%);
+  --glass-blur-m: blur(32px) saturate(160%);
+  --glass-blur-l: blur(48px) saturate(180%);
+  --glass-shadow: 0 8px 32px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25);
+  --glass-radius-s: 14px;
+  --glass-radius-m: 20px;
+  --glass-radius-l: 28px;
+  --accent-grad: conic-gradient(from 220deg, #ffd6e8, #c3a8ff, #a8d8ff, #ffd6e8);
+  --text-primary: #1a1a18;
+  --text-secondary: rgba(26,26,24,0.62);
+  --danger: #c14040;
+  --success: #2a7a44;
+}
+
+/* Notification badge on glass button */
+.glass-btn{position:relative}
+.glass-badge{
+  position:absolute;top:-4px;right:-4px;
+  min-width:18px;height:18px;padding:0 5px;
+  border-radius:99px;background:#e94e4e;color:#fff;
+  font-size:10px;font-weight:700;line-height:18px;text-align:center;
+  border:1.5px solid rgba(255,255,255,0.85);
+  box-shadow:0 2px 6px rgba(233,78,78,0.4);
+  z-index:2;
+}
+
+/* ----- Conversation banner (non-friend gate) ----- */
+.conv-banner{
+  display:flex;flex-direction:column;gap:10px;
+  margin:10px 16px 0;padding:14px 16px;
+  border-radius:var(--glass-radius-m);
+  border:1px solid var(--glass-stroke);
+  background:var(--glass-2);
+  backdrop-filter:var(--glass-blur-m);
+  -webkit-backdrop-filter:var(--glass-blur-m);
+  box-shadow:var(--glass-shadow);
+  font-size:13.5px;color:var(--text-primary);
+}
+.conv-banner-text{line-height:1.45}
+.conv-banner-actions{display:flex;gap:8px;justify-content:flex-end}
+.conv-banner .btn-primary,.conv-banner .btn-ghost,
+.req-btn,.fs-action,.result-start-btn{
+  font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;
+  border-radius:12px;padding:9px 16px;transition:all 0.2s ease;
+}
+.conv-banner .btn-primary,
+.req-btn.primary,
+.result-start-btn{
+  background:linear-gradient(180deg,rgba(255,255,255,0.32),rgba(255,255,255,0.12));
+  border:1px solid var(--glass-stroke);
+  color:var(--text-primary);
+  backdrop-filter:blur(18px);
+}
+.conv-banner .btn-ghost,
+.req-btn.ghost,
+.result-start-btn.ghost{
+  background:rgba(255,255,255,0.04);
+  border:1px solid var(--glass-stroke-soft);
+  color:var(--text-secondary);
+}
+.conv-banner .btn-primary:active,
+.req-btn:active,
+.result-start-btn:active{transform:scale(0.96)}
+
+/* ----- Friend Requests screen ----- */
+.req-tabs{
+  display:flex;gap:6px;margin:6px 24px 12px;
+  padding:5px;border-radius:14px;
+  background:var(--glass-2);
+  border:1px solid var(--glass-stroke-soft);
+  backdrop-filter:var(--glass-blur-s);
+}
+.req-tab{
+  flex:1;border:0;background:transparent;cursor:pointer;
+  padding:9px 12px;border-radius:10px;
+  font-family:inherit;font-size:13px;font-weight:600;
+  color:var(--text-secondary);transition:all .2s;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.req-tab.active{
+  background:linear-gradient(180deg,rgba(255,255,255,0.40),rgba(255,255,255,0.18));
+  color:var(--text-primary);
+  box-shadow:0 1px 6px rgba(0,0,0,0.06);
+}
+.req-tab-count{
+  font-size:11px;padding:0 6px;height:16px;line-height:16px;
+  border-radius:99px;background:rgba(0,0,0,0.06);min-width:16px;text-align:center;
+}
+.req-tab.active .req-tab-count{background:rgba(0,0,0,0.10)}
+
+.req-list{display:flex;flex-direction:column;gap:10px;padding:0 24px 20px}
+.req-card{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 14px;
+  border-radius:var(--glass-radius-m);
+  border:1px solid var(--glass-stroke);
+  background:var(--glass-2);
+  backdrop-filter:var(--glass-blur-m);
+  -webkit-backdrop-filter:var(--glass-blur-m);
+  box-shadow:var(--glass-shadow);
+  cursor:pointer;
+  transition:transform .2s ease;
+}
+.req-card:active{transform:scale(0.98)}
+.req-avatar{width:48px;height:48px;border-radius:50%;overflow:hidden;flex-shrink:0;
+  background:rgba(0,0,0,0.05)}
+.req-avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.req-info{flex:1;min-width:0}
+.req-name{font-size:14.5px;font-weight:600;color:var(--text-primary);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.req-handle{font-size:12.5px;color:var(--text-secondary);margin-top:1px}
+.req-bio{font-size:12px;color:var(--text-secondary);margin-top:4px;line-height:1.4;
+  display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.req-actions{display:flex;gap:6px;flex-shrink:0}
+.req-btn{padding:8px 12px;font-size:12.5px;border-radius:10px}
+
+/* ----- Friend Profile Sheet ----- */
+.friend-sheet-overlay{
+  position:fixed;inset:0;z-index:1300;
+  display:flex;align-items:flex-end;justify-content:center;
+  background:rgba(0,0,0,0.35);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  opacity:0;pointer-events:none;
+  transition:opacity .25s ease;
+}
+.friend-sheet-overlay.open{opacity:1;pointer-events:auto}
+.friend-sheet{
+  position:relative;width:100%;max-width:430px;
+  border-radius:28px 28px 0 0;
+  padding:20px 22px max(28px, env(safe-area-inset-bottom));
+  background:linear-gradient(180deg,rgba(255,255,255,0.22),rgba(255,255,255,0.12));
+  border:1px solid var(--glass-stroke);
+  border-bottom:none;
+  backdrop-filter:var(--glass-blur-l);
+  -webkit-backdrop-filter:var(--glass-blur-l);
+  box-shadow:var(--glass-shadow), 0 -20px 60px rgba(0,0,0,0.25);
+  transform:translateY(40px) scale(0.985);opacity:0;
+  transition:transform .36s cubic-bezier(0.22,1,0.36,1), opacity .28s ease;
+  overflow:hidden;
+}
+.friend-sheet-overlay.open .friend-sheet{transform:translateY(0) scale(1);opacity:1}
+.friend-sheet::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  border-radius:inherit;
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(255,255,255,0.22), transparent 55%),
+    radial-gradient(80% 60% at 100% 100%, rgba(255,255,255,0.06), transparent 60%);
+  mix-blend-mode:screen;
+}
+.friend-sheet > *{position:relative}
+.friend-sheet .modal-handle{
+  width:38px;height:4px;border-radius:99px;
+  background:rgba(255,255,255,0.55);
+  margin:-6px auto 14px;
+}
+.friend-sheet-close{
+  position:absolute;top:14px;right:14px;z-index:2;
+  width:32px;height:32px;border-radius:50%;
+  border:1px solid var(--glass-stroke-soft);
+  background:rgba(255,255,255,0.14);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--text-primary);
+}
+.friend-sheet-close svg{width:14px;height:14px}
+
+.friend-sheet-hero{display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:14px}
+.friend-sheet-avatar-ring{
+  width:104px;height:104px;border-radius:50%;
+  padding:2px;background:var(--accent-grad);
+  display:flex;margin-bottom:6px;
+  box-shadow:0 6px 24px rgba(0,0,0,0.18);
+}
+.friend-sheet-avatar-ring img{
+  width:100%;height:100%;border-radius:50%;
+  object-fit:cover;background:#fff;
+  border:2px solid rgba(255,255,255,0.5);
+}
+.friend-sheet-hero h2{
+  font-size:20px;font-weight:700;letter-spacing:-0.4px;
+  color:var(--text-primary);text-align:center;
+}
+.friend-sheet-handle{font-size:13.5px;color:var(--text-secondary)}
+.friend-sheet-bio{
+  font-size:13.5px;color:var(--text-primary);line-height:1.5;
+  text-align:center;max-width:320px;margin:6px 8px 0;
+}
+
+.friend-sheet-meta{
+  display:flex;justify-content:center;flex-wrap:wrap;gap:6px;
+  margin:10px 0 16px;
+}
+.fs-chip{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:5px 11px;border-radius:99px;
+  background:rgba(255,255,255,0.16);
+  border:1px solid var(--glass-stroke-soft);
+  font-size:12px;font-weight:500;color:var(--text-primary);
+  backdrop-filter:blur(12px);
+}
+.fs-dot{width:7px;height:7px;border-radius:50%;background:#3bcd6e;box-shadow:0 0 6px rgba(59,205,110,0.6)}
+
+.friend-sheet-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.fs-action{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:14px 8px;border-radius:16px;
+  background:linear-gradient(180deg,rgba(255,255,255,0.30),rgba(255,255,255,0.10));
+  border:1px solid var(--glass-stroke);
+  color:var(--text-primary);font-size:12px;font-weight:600;
+  backdrop-filter:var(--glass-blur-s);
+  cursor:pointer;transition:transform .15s ease, opacity .2s ease;
+}
+.fs-action svg{width:20px;height:20px}
+.fs-action:active:not(:disabled){transform:scale(0.96)}
+.fs-action:disabled{opacity:0.45;cursor:not-allowed}
+
+.friend-sheet-list{
+  display:flex;flex-direction:column;gap:6px;
+  border-radius:18px;overflow:hidden;
+  background:rgba(255,255,255,0.10);
+  border:1px solid var(--glass-stroke-soft);
+  backdrop-filter:var(--glass-blur-s);
+}
+.fs-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px;border:0;background:transparent;cursor:pointer;
+  font-family:inherit;font-size:14px;font-weight:500;color:var(--text-primary);
+  border-bottom:1px solid rgba(255,255,255,0.14);
+  text-align:left;
+}
+.fs-row:last-child{border-bottom:none}
+.fs-row:active{background:rgba(255,255,255,0.10)}
+.fs-row.danger{color:var(--danger)}
+.fs-row.primary{color:#1652d8}
+.fs-row-label{flex:1}
+.fs-chev{color:var(--text-secondary);font-size:18px;line-height:1}
+.fs-switch{
+  width:34px;height:20px;border-radius:99px;background:rgba(0,0,0,0.18);
+  position:relative;flex-shrink:0;
+}
+.fs-switch::after{
+  content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;
+  border-radius:50%;background:#fff;
+  box-shadow:0 1px 3px rgba(0,0,0,0.15);
+  transition:transform .2s ease;
+}
+
+/* Conv friend button (chat header) — make it look tappable */
+.conv-friend-btn{
+  flex:1;display:flex;align-items:center;gap:10px;
+  background:transparent;border:0;padding:4px 6px;border-radius:12px;
+  cursor:pointer;text-align:left;color:inherit;font:inherit;
+  transition:background .2s ease;
+}
+.conv-friend-btn:active{background:rgba(255,255,255,0.18)}
+
+/* Result-card extra: action slot and ghost variant */
+.result-card{align-items:center}
+.result-action-slot{display:flex;gap:6px;flex-shrink:0}
+.result-start-btn{padding:9px 14px;font-size:12.5px}
+
+/* @supports fallback for browsers without backdrop-filter */
+@supports not (backdrop-filter: blur(1px)){
+  .friend-sheet{background:rgba(245,242,250,0.96)}
+  .req-card,.conv-banner,.fs-action,.fs-chip,.req-tabs,.friend-sheet-list{
+    background:rgba(255,255,255,0.85);
+  }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .friend-sheet{transition:none;transform:none}
+  .friend-sheet-overlay{transition:none}
+}
+
+/* Requests screen header (back-btn + h1 left-aligned) */
+#screenRequests .header{justify-content:flex-start;gap:8px}
+#screenRequests .header h1{font-size:22px;font-weight:700;letter-spacing:-0.4px}
