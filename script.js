@@ -1651,6 +1651,26 @@ function bootUnauthed() {
   document.getElementById('settingsMenuItem').addEventListener('click',
     () => showScreen('settings'));
 
+  // Share my profile
+  document.getElementById('shareProfileMenuItem')?.addEventListener('click', async () => {
+    if (!me || !me.id) {
+      toast('Profile not loaded yet');
+      return;
+    }
+    const shareUrl = `${window.location.origin}${window.location.pathname}?user=${me.id}`;
+    const name = me.full_name || me.display_name || me.username || 'me';
+    const shareText = `Connect with me (@${me.username || 'user'}) on PopChats!`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `${name} - PopChats`, text: shareText, url: shareUrl });
+      } catch (e) {
+        if (e.name !== 'AbortError') copyToClipboard(shareUrl);
+      }
+    } else {
+      copyToClipboard(shareUrl);
+    }
+  });
+
   // Friend Requests screen
   const openReq = document.getElementById('openRequestsBtn');
   if (openReq) openReq.addEventListener('click', () => {

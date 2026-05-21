@@ -8,12 +8,61 @@ window.PopChatsDB = (function () {
   }
 
   // ---------- profiles ----------
+  function getSessionTokenSync() {
+    // Read session directly from localStorage to bypass any client lock
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('sb-') && k.includes('auth-token')) {
+          const raw = localStorage.getItem(k);
+          if (!raw) continue;
+          const parsed = JSON.parse(raw);
+          // Could be { access_token, ... } or { currentSession: { access_token, ... } }
+          if (parsed.access_token) return parsed.access_token;
+          if (parsed.currentSession && parsed.currentSession.access_token) {
+            return parsed.currentSession.access_token;
+          }
+        }
+      }
+    } catch (e) {}
+    return null;
+  }
+
   async function getMyProfile(userId) {
     const id = userId || await uid(); 
     if (!id) return null;
-    const { data, error } = await client().from('profiles').select('*').eq('id', id).maybeSingle();
-    if (error) console.error('[getMyProfile]', error);
-    return data;
+    
+    // Use raw fetch to bypass any client-side auth lock issues
+    const token = getSessionTokenSync();
+    if (token) {
+      try {
+        const url = `${window.SUPABASE_URL}/rest/v1/profiles?id=eq.${id}&select=*`;
+        const res = await fetch(url, {
+          headers: {
+            'apikey': window.SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        });
+        if (res.ok) {
+          const arr = await res.json();
+          return Array.isArray(arr) && arr.length ? arr[0] : null;
+        }
+        console.error('[getMyProfile] HTTP', res.status);
+      } catch (e) {
+        console.error('[getMyProfile] fetch error:', e);
+      }
+    }
+    
+    // Fallback to client query (slower but more reliable)
+    try {
+      const { data, error } = await client().from('profiles').select('*').eq('id', id).maybeSingle();
+      if (error) console.error('[getMyProfile] client error:', error);
+      return data;
+    } catch (e) {
+      console.error('[getMyProfile] all failed:', e);
+      return null;
+    }
   }
 
   async function upsertMyProfile(patch) {
