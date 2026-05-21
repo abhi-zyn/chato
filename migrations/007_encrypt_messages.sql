@@ -13,7 +13,7 @@
 -- Once set, do NOT change it — old messages become unreadable.
 -- =========================================================
 
-create extension if not exists pgcrypto;
+create extension if not exists pgcrypto with schema extensions;
 
 -- Add ciphertext column. Old plaintext rows keep their `text`.
 alter table public.messages
@@ -30,7 +30,7 @@ returns text
 language sql
 immutable
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
   select 'CHANGE_ME_TO_A_LONG_RANDOM_PASSPHRASE_AT_LEAST_32_CHARS'::text;
 $$;
@@ -51,7 +51,7 @@ returns table (
 )
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   me uuid := auth.uid();
@@ -87,7 +87,7 @@ returns table (
 language plpgsql
 stable
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare me uuid := auth.uid();
 begin
@@ -117,7 +117,7 @@ returns text
 language plpgsql
 stable
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   m record;
@@ -144,7 +144,7 @@ returns table (text text, created_at timestamptz)
 language plpgsql
 stable
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare me uuid := auth.uid();
 begin

@@ -1357,7 +1357,7 @@ async function bootAuthed(user) {
       showScreen('chats', 'chats');
 
       // 2) Kick off profile + chat list in PARALLEL (both are independent reads)
-      const profilePromise = withTimeout(PopChatsDB.getMyProfile(), 5000, 'getMyProfile')
+      const profilePromise = withTimeout(PopChatsDB.getMyProfile(), 8000, 'getMyProfile')
         .catch(e => { console.error('getMyProfile failed:', e); return null; });
       const chatsRenderPromise = loadChatList().catch(e => console.error('loadChatList:', e));
 
@@ -1369,7 +1369,7 @@ async function bootAuthed(user) {
         try {
           me = await withTimeout(
             PopChatsDB.upsertMyProfile({ username: fallbackUsername, display_name: fallbackUsername }),
-            5000, 'upsertMyProfile');
+            8000, 'upsertMyProfile');
         } catch (e) { console.error('profile init failed', e); }
       }
 
