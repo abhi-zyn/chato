@@ -28,9 +28,92 @@ let messageSub = null;  // realtime channel for active chat
 let allMessagesSub = null; // global realtime channel for ALL my chats
 let messagePoller = null;  // polling fallback handle
 let friendActivitySub = null;  // realtime channel for friend requests
+let onlineHeartbeatId = null;  // setInterval id for online heartbeat
+let presenceWatcherId = null;  // setInterval id for refreshing other users' online status
 let pendingRequestCount = 0;   // incoming pending requests, for badge
 let activeRequestTab = 'incoming';
 const _seenMessageIds = new Set(); // dedupe between realtime + polling
+
+// Online heartbeat — keeps last_seen fresh while tab is open
+function startOnlineHeartbeat() {
+  stopOnlineHeartbeat();
+  // Mark online immediately
+  PopChatsDB.markOnline(true).catch(() => {});
+  // Then every 20 seconds
+  onlineHeartbeatId = setInterval(() => {
+    if (document.visibilityState === 'visible' && me) {
+      PopChatsDB.markOnline(true).catch(() => {});
+    }
+  }, 20000);
+}
+function stopOnlineHeartbeat() {
+  if (onlineHeartbeatId) {
+    clearInterval(onlineHeartbeatId);
+    onlineHeartbeatId = null;
+  }
+}
+
+// Presence watcher — refreshes online status of other users in my chat list every 30s
+function startPresenceWatcher() {
+  stopPresenceWatcher();
+  presenceWatcherId = setInterval(refreshPresence, 30000);
+  // Also run immediately
+  setTimeout(refreshPresence, 1000);
+}
+function stopPresenceWatcher() {
+  if (presenceWatcherId) {
+    clearInterval(presenceWatcherId);
+    presenceWatcherId = null;
+  }
+}
+
+async function refreshPresence() {
+  if (!_cache.chats || !_cache.chats.length) return;
+  if (document.visibilityState !== 'visible') return; // save bandwidth
+  const otherIds = _cache.chats
+    .map(c => c.other && c.other.id)
+    .filter(Boolean);
+  if (!otherIds.length) return;
+  try {
+    const presence = await PopChatsDB.getPresence(otherIds);
+    // Update cached chat list
+    _cache.chats.forEach(c => {
+      if (c.other && presence[c.other.id]) {
+        c.other.online = presence[c.other.id].online;
+        c.other.last_seen = presence[c.other.id].last_seen;
+      }
+    });
+    _cache.chats = _cache.chats; // persist
+    // Update online dots in chat list
+    _cache.chats.forEach(c => updateChatCardOnline(c.id, c.other && c.other.online));
+    // Update conv header if active
+    if (activeChat && activeChat.other && presence[activeChat.other.id]) {
+      const p = presence[activeChat.other.id];
+      activeChat.other.online = p.online;
+      activeChat.other.last_seen = p.last_seen;
+      if (convSt) convSt.textContent = p.online ? 'Online' : 'Offline';
+    }
+  } catch (e) {
+    console.error('[refreshPresence]', e);
+  }
+}
+
+// Update just the online dot on a chat card (no full re-render)
+function updateChatCardOnline(chatId, isOnline) {
+  if (!chatList) return;
+  const card = chatList.querySelector(`.chat-card[data-id="${chatId}"]`);
+  if (!card) return;
+  const meta = card.querySelector('.chat-meta');
+  if (!meta) return;
+  const existingDot = meta.querySelector('.online');
+  if (isOnline && !existingDot) {
+    const dot = document.createElement('div');
+    dot.className = 'online';
+    meta.appendChild(dot);
+  } else if (!isOnline && existingDot) {
+    existingDot.remove();
+  }
+}
 
 // Unread counts per chat (persisted in localStorage)
 const _unread = {
@@ -1835,6 +1918,8 @@ async function bootAuthed(user) {
 
       // 5) Fire-and-forget non-critical work (don't block splash)
       PopChatsDB.markOnline(true).catch(() => {});
+      startOnlineHeartbeat();
+      startPresenceWatcher();
       refreshRequestsBadge().catch(() => {});
       if (friendActivitySub) { PopChatsDB.unsubscribe(friendActivitySub); friendActivitySub = null; }
       if (me && me.id) {
@@ -1895,6 +1980,8 @@ function bootUnauthed() {
   if (friendActivitySub) { PopChatsDB.unsubscribe(friendActivitySub); friendActivitySub = null; }
   if (allMessagesSub) { PopChatsDB.unsubscribe(allMessagesSub); allMessagesSub = null; }
   if (messagePoller) { messagePoller.cancel(); messagePoller = null; }
+  stopOnlineHeartbeat();
+  stopPresenceWatcher();
   setRequestsBadge(0);
   showScreen('login');
 }
@@ -2363,6 +2450,17 @@ function bootUnauthed() {
   // Mark offline on page hide
   window.addEventListener('beforeunload', () => {
     if (me) { PopChatsDB.markOnline(false); }
+  });
+
+  // Mark offline when tab is hidden (mobile-friendly), online again on focus
+  document.addEventListener('visibilitychange', () => {
+    if (!me) return;
+    if (document.visibilityState === 'hidden') {
+      PopChatsDB.markOnline(false).catch(() => {});
+    } else {
+      PopChatsDB.markOnline(true).catch(() => {});
+      refreshPresence(); // immediate refresh of other users' status
+    }
   });
 
   // Online count badge in random-chat card

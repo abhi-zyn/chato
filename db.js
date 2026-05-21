@@ -133,10 +133,46 @@ window.PopChatsDB = (function () {
   }
 
   async function markOnline(online) {
-    const id = await uid(); if (!id) return;
-    await client().from('profiles')
-      .update({ online, last_seen: new Date().toISOString() })
-      .eq('id', id);
+    const id = getUserIdSync();
+    if (!id) return;
+    const token = getSessionTokenSync();
+    if (!token) return;
+    // Use raw fetch to avoid client lock issues
+    try {
+      const url = `${window.SUPABASE_URL}/rest/v1/profiles?id=eq.${id}`;
+      await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'apikey': window.SUPABASE_PUBLISHABLE_KEY,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          online: !!online,
+          last_seen: new Date().toISOString()
+        })
+      });
+    } catch (e) {
+      console.error('[markOnline]', e);
+    }
+  }
+
+  // Get last_seen for a list of user IDs (used to compute "online" status)
+  async function getPresence(userIds) {
+    if (!userIds || !userIds.length) return {};
+    const ids = `(${userIds.join(',')})`;
+    const r = await rawSelect('profiles', `id=in.${ids}&select=id,online,last_seen`);
+    if (r.error || !r.data) return {};
+    const out = {};
+    const now = Date.now();
+    r.data.forEach(p => {
+      const last = p.last_seen ? new Date(p.last_seen).getTime() : 0;
+      // Consider user online if explicitly online OR last_seen within 45s
+      const isOnline = p.online === true && (now - last) < 45000;
+      out[p.id] = { online: isOnline, last_seen: p.last_seen };
+    });
+    return out;
   }
 
   async function countOnline() {
@@ -595,7 +631,7 @@ window.PopChatsDB = (function () {
 
   return {
     getMyProfile, upsertMyProfile, updateMyProfile, getProfile,
-    searchProfiles, markOnline, countOnline,
+    searchProfiles, markOnline, countOnline, getPresence,
     uploadAvatar, isUsernameAvailable, emailExists,
     friendshipState, friendshipStatesFor,
     sendFriendRequest, acceptFriendRequest, declineFriendRequest,
