@@ -295,15 +295,17 @@ html,body { height:100%; width:100%; overflow:hidden; overscroll-behavior:none; 
 }
 
 /* Notification badge on glass button */
-.glass-btn{position:relative}
+.glass-btn{position:relative;overflow:visible !important}
+.glass-btn::before{border-radius:14px;clip-path:inset(0 round 14px)}
 .glass-badge{
-  position:absolute;top:-4px;right:-4px;
+  position:absolute;top:-5px;right:-5px;
   min-width:18px;height:18px;padding:0 5px;
   border-radius:99px;background:#e94e4e;color:#fff;
   font-size:10px;font-weight:700;line-height:18px;text-align:center;
   border:1.5px solid rgba(255,255,255,0.85);
   box-shadow:0 2px 6px rgba(233,78,78,0.4);
-  z-index:2;
+  z-index:10;
+  pointer-events:none;
 }
 
 /* ----- Conversation banner (non-friend gate) ----- */

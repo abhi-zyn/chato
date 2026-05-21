@@ -233,9 +233,21 @@ function renderChatListDOM(chats) {
         `<div class="chat-sub">${sub}</div>` +
       `</div>` +
       `<div class="chat-meta">${dot}</div>`;
-    card.addEventListener('click', () => openChat(c.id, other, c.is_stranger));
+    // Store data on the card for delegation
+    card._chatData = { id: c.id, other, isStranger: c.is_stranger };
     chatList.appendChild(card);
     setTimeout(() => card.classList.add('show'), i * 60);
+  });
+}
+
+// Event delegation for chat card clicks (more robust than per-card handlers)
+if (chatList && !chatList._delegated) {
+  chatList._delegated = true;
+  chatList.addEventListener('click', (e) => {
+    const card = e.target.closest('.chat-card');
+    if (!card || !card._chatData) return;
+    const d = card._chatData;
+    openChat(d.id, d.other, d.isStranger);
   });
 }
 
