@@ -1595,6 +1595,17 @@ async function bootAuthed(user) {
       if (me && !me.onboarded) openOnboardingModal(user);
       // PWA install prompt: first login + every 5 days
       maybeShowInstallPrompt();
+      // Handle shared profile link (?user=...)
+      const sharedUserId = new URLSearchParams(window.location.search).get('user');
+      if (sharedUserId) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+        try {
+          const profile = await PopChatsDB.getProfile(sharedUserId);
+          if (profile) openFriendSheet(profile);
+        } catch (e) {
+          console.error('Failed to load shared profile:', e);
+        }
+      }
     } catch (e) {
       console.error('bootAuthed error', e);
       showScreen('chats', 'chats');
@@ -1921,6 +1932,44 @@ function bootUnauthed() {
     const enabled = WebRTCCall.toggleVideo();
     e.currentTarget.style.opacity = enabled ? '1' : '0.5';
   });
+
+  // Share profile button
+  document.getElementById('friendSheetShare')?.addEventListener('click', async () => {
+    const userId = document.getElementById('friendSheetHandle').dataset.userId;
+    const username = document.getElementById('friendSheetHandle').textContent.replace('@', '');
+    const name = document.getElementById('friendSheetName').textContent;
+    
+    if (!userId || !username) return;
+    
+    const shareUrl = `${window.location.origin}${window.location.pathname}?user=${userId}`;
+    const shareText = `Check out ${name} (@${username}) on PopChats!`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `${name} - PopChats`, text: shareText, url: shareUrl });
+      } catch (e) {
+        if (e.name !== 'AbortError') copyToClipboard(shareUrl);
+      }
+    } else {
+      copyToClipboard(shareUrl);
+    }
+  });
+
+  function copyToClipboard(text) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => toast('Profile link copied!'));
+    } else {
+      const tmp = document.createElement('textarea');
+      tmp.value = text;
+      tmp.style.position = 'fixed';
+      tmp.style.opacity = '0';
+      document.body.appendChild(tmp);
+      tmp.select();
+      document.execCommand('copy');
+      document.body.removeChild(tmp);
+      toast('Profile link copied!');
+    }
+  }
 
   // Auth state
   const hadOAuthCode = !!(new URLSearchParams(window.location.search).get('code'));
