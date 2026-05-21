@@ -241,15 +241,23 @@ function renderChatListDOM(chats) {
 }
 
 // Event delegation for chat card clicks (more robust than per-card handlers)
-if (chatList && !chatList._delegated) {
+function setupChatListDelegation() {
+  if (!chatList || chatList._delegated) return;
   chatList._delegated = true;
-  chatList.addEventListener('click', (e) => {
+  // Use both 'click' and 'pointerup' for max reliability across devices
+  const handler = (e) => {
     const card = e.target.closest('.chat-card');
     if (!card || !card._chatData) return;
+    e.preventDefault();
+    e.stopPropagation();
     const d = card._chatData;
     openChat(d.id, d.other, d.isStranger);
-  });
+  };
+  chatList.addEventListener('click', handler);
 }
+setupChatListDelegation();
+// Also retry after DOM may have new content
+document.addEventListener('DOMContentLoaded', setupChatListDelegation);
 
 // ---------- conversation ----------
 async function openChat(chatId, otherProfile, isStranger) {
@@ -345,7 +353,53 @@ function setSendDisabled(disabled) {
 }
 
 // ---------- Session cache (reduces network on repeated views) ----------
-const _cache = { chats: null, messages: {} };
+// Cache: in-memory + localStorage persistence so refreshes show data instantly
+const _cacheKey = (name) => `popchats.cache.${name}`;
+const _cache = {
+  get chats() {
+    if (this._chats !== undefined) return this._chats;
+    try {
+      const raw = localStorage.getItem(_cacheKey('chats'));
+      this._chats = raw ? JSON.parse(raw) : null;
+    } catch (_) { this._chats = null; }
+    return this._chats;
+  },
+  set chats(v) {
+    this._chats = v;
+    try {
+      if (v) localStorage.setItem(_cacheKey('chats'), JSON.stringify(v));
+      else localStorage.removeItem(_cacheKey('chats'));
+    } catch (_) {}
+  },
+  get messages() {
+    if (this._messages) return this._messages;
+    try {
+      const raw = localStorage.getItem(_cacheKey('messages'));
+      this._messages = raw ? JSON.parse(raw) : {};
+    } catch (_) { this._messages = {}; }
+    return this._messages;
+  },
+  set messages(v) {
+    this._messages = v;
+    try {
+      localStorage.setItem(_cacheKey('messages'), JSON.stringify(v));
+    } catch (_) {}
+  },
+  saveMessages() {
+    // Call after mutating _cache.messages[chatId] in place
+    try {
+      localStorage.setItem(_cacheKey('messages'), JSON.stringify(this._messages || {}));
+    } catch (_) {}
+  },
+  clearAll() {
+    this._chats = undefined;
+    this._messages = null;
+    try {
+      localStorage.removeItem(_cacheKey('chats'));
+      localStorage.removeItem(_cacheKey('messages'));
+    } catch (_) {}
+  }
+};
 
 async function renderMessages(chatId) {
   msgBox.innerHTML = '';
@@ -357,6 +411,7 @@ async function renderMessages(chatId) {
     // Background refresh
     PopChatsDB.listMessages(chatId).then(list => {
       _cache.messages[chatId] = list;
+      _cache.saveMessages();
       // Only re-render if new messages arrived
       if (list.length !== cached.length || (list.length && list[list.length-1].id !== cached[cached.length-1].id)) {
         msgBox.innerHTML = '';
@@ -367,6 +422,7 @@ async function renderMessages(chatId) {
   } else {
     const list = await PopChatsDB.listMessages(chatId);
     _cache.messages[chatId] = list;
+    _cache.saveMessages();
     list.forEach((m, i) => appendMessage(m, false, i));
     requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
   }
@@ -390,6 +446,7 @@ function appendMessage(m, animate = true, idx = 0) {
     if (!_cache.messages[chatId]) _cache.messages[chatId] = [];
     if (!_cache.messages[chatId].find(x => x.id === m.id)) {
       _cache.messages[chatId].push(m);
+      _cache.saveMessages();
     }
   }
 }
@@ -1911,9 +1968,8 @@ function bootUnauthed() {
       try { if (messageSub) { PopChatsDB.unsubscribe(messageSub); messageSub = null; } } catch (_) {}
       try { if (friendActivitySub) { PopChatsDB.unsubscribe(friendActivitySub); friendActivitySub = null; } } catch (_) {}
       await PopChatsAuth.signOut().catch(() => {});
-      // Clear session cache
-      _cache.chats = null;
-      _cache.messages = {};
+      // Clear all cached data (in-memory + localStorage)
+      _cache.clearAll();
       me = null;
       bootingAuthed = false;
       showScreen('login');
