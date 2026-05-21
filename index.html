@@ -4,29 +4,59 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>PopChats</title>
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="login.css?v=3">
+<link rel="stylesheet" href="login.css?v=4">
 <link rel="stylesheet" href="desktop.css?v=2">
 <script>
-  // Show OAuth splash IMMEDIATELY if URL has ?code= (before main script runs)
+  // Show splash IMMEDIATELY for EVERY load — hides after auth state resolves.
   (function () {
     try {
       var p = new URLSearchParams(window.location.search);
-      if (p.has('code') || p.has('error')) {
-        document.documentElement.classList.add('oauth-callback');
+      var hasOAuth = p.has('code') || p.has('error');
+      var hasSavedSession = false;
+      try {
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (k && k.indexOf('sb-') === 0 && k.indexOf('auth-token') !== -1) {
+            hasSavedSession = true; break;
+          }
+        }
+      } catch (_) {}
+      // Only show splash if there's a real reason to wait.
+      // If user is fresh (no session, no oauth code) → skip splash, show login directly.
+      if (hasOAuth || hasSavedSession) {
+        document.documentElement.classList.add('is-loading');
       }
+      if (hasOAuth) document.documentElement.classList.add('oauth-callback');
+      if (hasSavedSession) document.documentElement.classList.add('has-session');
+      // Hard safety: force-hide splash after 8 seconds no matter what
+      setTimeout(function () {
+        document.documentElement.classList.remove('is-loading');
+        document.documentElement.classList.remove('oauth-callback');
+        document.documentElement.classList.remove('has-session');
+        document.body && document.body.classList.remove('oauth-splash-on');
+      }, 8000);
     } catch (e) {}
   })();
 </script>
 </head>
 <body>
-<!-- OAuth Splash (shown only when html has .oauth-callback or body has .oauth-splash-on) -->
+<!-- App Splash (shown on every load until auth state resolves) -->
 <div id="oauthSplash" aria-hidden="true">
   <div class="oauth-splash-card">
-    <div class="oauth-spinner"></div>
-    <div class="oauth-splash-title" id="oauthSplashTitle">Signing you in…</div>
-    <div class="oauth-splash-sub" id="oauthSplashSub">Hang tight, finishing up your session</div>
+    <div class="splash-brand-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    </div>
+    <div class="oauth-splash-title" id="oauthSplashTitle">PopChats</div>
+    <div class="oauth-splash-sub" id="oauthSplashSub">Loading your conversations…</div>
+    <div class="splash-ios-spinner" aria-hidden="true">
+      <span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span>
+    </div>
   </div>
 </div>
 <div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>

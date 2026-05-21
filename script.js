@@ -58,24 +58,25 @@ function toast(text) {
   t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3500);
 }
 
-// ---------- OAuth splash (full-screen "Signing you in") ----------
+// ---------- App splash (full-screen "Loading…") ----------
 function showOAuthSplash(isAuth) {
-  // Splash element exists in the HTML; we just toggle visibility classes.
   document.body.classList.add('oauth-splash-on');
   document.documentElement.classList.add('oauth-callback');
   const t = document.getElementById('oauthSplashTitle');
   const s = document.getElementById('oauthSplashSub');
   if (isAuth) {
-    if (t) t.textContent = 'Signing you in…';
+    if (t) t.textContent = 'Signing you in';
     if (s) s.textContent = 'Hang tight, finishing up your session';
   } else {
-    if (t) t.textContent = "Hmm, that didn't work";
+    if (t) t.textContent = "That didn't work";
     if (s) s.textContent = 'Sending you back to the login screen…';
   }
 }
 function hideOAuthSplash() {
   document.body.classList.remove('oauth-splash-on');
   document.documentElement.classList.remove('oauth-callback');
+  document.documentElement.classList.remove('is-loading');
+  document.documentElement.classList.remove('has-session');
 }
 
 // ---------- themes ----------
@@ -1217,6 +1218,8 @@ function bootUnauthed() {
   const session = await PopChatsAuth.getSession();
   if (session) await bootAuthed(session.user);
   else bootUnauthed();
+  // Hide splash now that auth state is determined for normal (non-OAuth) loads
+  hideOAuthSplash();
 
   // Clock
   function updateClock() {
