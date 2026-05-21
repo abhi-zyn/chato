@@ -1091,9 +1091,13 @@ function bootUnauthed() {
   const oauthCode = urlObj.searchParams.get('code');
   const oauthError = urlObj.searchParams.get('error') || urlObj.searchParams.get('error_description');
 
+  // Safety: never let splash stick forever, even on a JS error
+  const splashWatchdog = setTimeout(() => hideOAuthSplash(), 12000);
+
   if (oauthError) {
     showOAuthSplash(false);
     setTimeout(() => {
+      clearTimeout(splashWatchdog);
       hideOAuthSplash();
       toast('Sign-in cancelled or failed.');
       bootUnauthed();
@@ -1101,7 +1105,7 @@ function bootUnauthed() {
   } else if (oauthCode) {
     showOAuthSplash(true);
     try {
-      // detectSessionInUrl might already have consumed the code. Try getSession first.
+      // detectSessionInUrl may already have consumed the code. Try getSession first.
       let { data: { session } } = await window.sb.auth.getSession();
       if (!session) {
         const res = await window.sb.auth.exchangeCodeForSession(window.location.href);
@@ -1112,17 +1116,26 @@ function bootUnauthed() {
       urlObj.searchParams.delete('code');
       urlObj.searchParams.delete('state');
       window.history.replaceState({}, document.title, urlObj.pathname + urlObj.search + urlObj.hash);
+
       if (session) {
-        await bootAuthed(session.user);
+        // Hide splash IMMEDIATELY — the screen switches to chats inside bootAuthed.
+        // We don't await bootAuthed (avoid blocking on slow profile/chat-list queries).
+        clearTimeout(splashWatchdog);
+        showScreen('chats', 'chats');
         hideOAuthSplash();
+        bootAuthed(session.user).catch(err => console.error('bootAuthed (oauth):', err));
         return;
       }
+      // No session for some reason — fall through to login.
+      clearTimeout(splashWatchdog);
+      hideOAuthSplash();
     } catch (e) {
       console.error('[OAuth] exchange failed:', e);
       const msg = (e.message || '').toLowerCase();
       const friendly = msg.includes('verifier') || msg.includes('flow state')
         ? 'Sign-in expired. Please try again.'
         : 'Sign-in failed: ' + (e.message || 'unknown');
+      clearTimeout(splashWatchdog);
       hideOAuthSplash();
       toast(friendly);
       // Clean URL so the error doesn't loop on refresh
@@ -1130,7 +1143,8 @@ function bootUnauthed() {
       urlObj.searchParams.delete('state');
       window.history.replaceState({}, document.title, urlObj.pathname);
     }
-    hideOAuthSplash();
+  } else {
+    clearTimeout(splashWatchdog);
   }
 
   const session = await PopChatsAuth.getSession();
