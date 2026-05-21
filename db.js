@@ -443,9 +443,19 @@ window.PopChatsDB = (function () {
   // GLOBAL message subscription — listens to all messages across the user's chats.
   // Used for unread counters and surfacing notifications even when a chat isn't open.
   function subscribeToAllMyMessages(onMessage) {
+    const c = client();
+    
+    // Ensure realtime client has the current auth token (critical for RLS-protected channels)
+    try {
+      const token = getSessionTokenSync();
+      if (token && c.realtime && c.realtime.setAuth) {
+        c.realtime.setAuth(token);
+      }
+    } catch (e) {}
+    
     // We can't filter by chat_id list in postgres_changes, so we subscribe to ALL
     // messages and filter client-side using the chat IDs we know about.
-    const ch = client()
+    const ch = c
       .channel('my-messages')
       .on(
         'postgres_changes',
@@ -468,6 +478,59 @@ window.PopChatsDB = (function () {
         console.log('[db] my-messages channel status:', status);
       });
     return ch;
+  }
+
+  // POLLING fallback — checks for new messages every N seconds.
+  // Runs alongside realtime so we catch messages even if websocket is dropped
+  // (mobile networks, background tabs, etc.)
+  function startMessagePolling(onNewMessage, intervalMs = 5000) {
+    let lastSeenAt = new Date().toISOString();
+    let cancelled = false;
+
+    async function poll() {
+      if (cancelled) return;
+      const id = getUserIdSync();
+      if (!id) {
+        if (!cancelled) setTimeout(poll, intervalMs);
+        return;
+      }
+      try {
+        // Get my chat IDs first
+        const m1 = await rawSelect('chat_members', `user_id=eq.${id}&select=chat_id`);
+        const chatIds = (m1.data || []).map(m => m.chat_id);
+        if (!chatIds.length) {
+          setTimeout(poll, intervalMs);
+          return;
+        }
+        const inList = `(${chatIds.join(',')})`;
+        // Fetch messages newer than last seen
+        const r = await rawSelect('messages',
+          `chat_id=in.${inList}&created_at=gt.${encodeURIComponent(lastSeenAt)}&select=*&order=created_at.asc&limit=50`);
+        if (r.data && r.data.length) {
+          // Update lastSeenAt to the most recent message
+          lastSeenAt = r.data[r.data.length - 1].created_at;
+          // Process each new message
+          for (const msg of r.data) {
+            if (msg.text_enc && !msg.text) {
+              try {
+                const plain = await decryptMessage(msg.id);
+                msg.text = plain || '';
+              } catch (e) {}
+            }
+            onNewMessage(msg);
+          }
+        }
+      } catch (e) {
+        console.error('[poll] error:', e);
+      }
+      if (!cancelled) setTimeout(poll, intervalMs);
+    }
+    
+    setTimeout(poll, intervalMs);
+    
+    return {
+      cancel: () => { cancelled = true; }
+    };
   }
 
   function unsubscribe(ch) {
@@ -502,7 +565,7 @@ window.PopChatsDB = (function () {
     subscribeToFriendActivity,
     listMyChats, getChatMembers,
     getOrCreateDM, startStrangerChat, pickRandomStranger,
-    listMessages, sendMessage, subscribeToChat, subscribeToAllMyMessages, unsubscribe,
+    listMessages, sendMessage, subscribeToChat, subscribeToAllMyMessages, startMessagePolling, unsubscribe,
     decryptMessage, lastMessagePreview,
     listNotifications, listCalls
   };

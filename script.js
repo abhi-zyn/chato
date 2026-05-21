@@ -26,9 +26,11 @@ let me = null;          // current profile row from public.profiles
 let activeChat = null;  // { id, other }
 let messageSub = null;  // realtime channel for active chat
 let allMessagesSub = null; // global realtime channel for ALL my chats
+let messagePoller = null;  // polling fallback handle
 let friendActivitySub = null;  // realtime channel for friend requests
 let pendingRequestCount = 0;   // incoming pending requests, for badge
 let activeRequestTab = 'incoming';
+const _seenMessageIds = new Set(); // dedupe between realtime + polling
 
 // Unread counts per chat (persisted in localStorage)
 const _unread = {
@@ -306,14 +308,20 @@ function updateGlobalUnreadBadge() {
 
 // Handle incoming message from global realtime subscription
 function handleIncomingMessage(msg) {
-  console.log('[realtime] message received:', msg);
-  if (!msg || !msg.chat_id || !msg.sender_id) {
-    console.log('[realtime] missing fields, skipping');
-    return;
+  if (!msg || !msg.chat_id || !msg.sender_id || !msg.id) return;
+  // Dedupe: realtime + polling may both deliver the same message
+  if (_seenMessageIds.has(msg.id)) return;
+  _seenMessageIds.add(msg.id);
+  // Keep set bounded
+  if (_seenMessageIds.size > 500) {
+    const arr = Array.from(_seenMessageIds);
+    arr.slice(0, 250).forEach(id => _seenMessageIds.delete(id));
   }
+  
+  console.log('[realtime] message received:', msg.id);
+  
   // Ignore my own messages (already handled by send flow)
   if (me && msg.sender_id === me.id) {
-    console.log('[realtime] own message, skipping unread bump');
     return;
   }
 
@@ -328,14 +336,12 @@ function handleIncomingMessage(msg) {
 
   // If this chat is currently open, append message directly (no unread bump)
   if (activeChat && activeChat.id === msg.chat_id) {
-    console.log('[realtime] chat is active, appending message');
     appendMessage(msg);
     return;
   }
 
   // Bump unread counter
   _unread.inc(msg.chat_id);
-  console.log('[realtime] unread incremented for', msg.chat_id, '→', _unread.get(msg.chat_id));
   updateChatCardUnread(msg.chat_id);
   updateGlobalUnreadBadge();
 
@@ -1822,11 +1828,13 @@ async function bootAuthed(user) {
       // GLOBAL realtime subscription — listens for messages on ALL my chats
       // Updates unread counters and shows toast notifications for non-active chats
       if (allMessagesSub) { PopChatsDB.unsubscribe(allMessagesSub); allMessagesSub = null; }
+      if (messagePoller) { messagePoller.cancel(); messagePoller = null; }
       if (me && me.id) {
-        console.log('[realtime] subscribing to all messages for user', me.id);
-        allMessagesSub = PopChatsDB.subscribeToAllMyMessages((msg) => {
-          handleIncomingMessage(msg);
-        });
+        // Try realtime first
+        allMessagesSub = PopChatsDB.subscribeToAllMyMessages(handleIncomingMessage);
+        // Always run polling as a fallback (every 5s) — handles cases where
+        // realtime websocket is dropped, throttled, or blocked (mobile browsers)
+        messagePoller = PopChatsDB.startMessagePolling(handleIncomingMessage, 5000);
       }
       if (me && !me.onboarded) openOnboardingModal(user);
       // PWA install prompt: first login + every 5 days
@@ -1861,6 +1869,7 @@ function bootUnauthed() {
   if (messageSub) { PopChatsDB.unsubscribe(messageSub); messageSub = null; }
   if (friendActivitySub) { PopChatsDB.unsubscribe(friendActivitySub); friendActivitySub = null; }
   if (allMessagesSub) { PopChatsDB.unsubscribe(allMessagesSub); allMessagesSub = null; }
+  if (messagePoller) { messagePoller.cancel(); messagePoller = null; }
   setRequestsBadge(0);
   showScreen('login');
 }
