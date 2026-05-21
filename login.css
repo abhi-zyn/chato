@@ -590,3 +590,78 @@ body.modal-open { overflow: hidden; }
   .login-submit-btn { height: 48px; }
   .gender-chip { flex: 1 1 calc(50% - 3px); }
 }
+
+
+/* ==========================================
+   OAuth Splash Screen (Google sign-in callback)
+   ========================================== */
+#oauthSplash {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 237, 224, 0.7);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.4s ease, visibility 0s linear 0.4s;
+  padding: 24px;
+}
+#oauthSplash.open {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.4s ease, visibility 0s linear 0s;
+}
+
+#oauthSplash .oauth-splash-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 38px 32px 32px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 28px;
+  box-shadow:
+    0 30px 80px rgba(60, 50, 40, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  font-family: 'Geist', sans-serif;
+  text-align: center;
+  max-width: 320px;
+  animation: oauthSplashIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes oauthSplashIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+
+#oauthSplash .oauth-spinner {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid rgba(244, 113, 58, 0.18);
+  border-top-color: #f4713a;
+  border-right-color: #f4a876;
+  animation: spin 0.85s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+  margin-bottom: 4px;
+  box-shadow: 0 4px 16px rgba(244, 113, 58, 0.18);
+}
+
+#oauthSplash .oauth-splash-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: 24px;
+  font-weight: 400;
+  color: #1a1a18;
+  letter-spacing: -0.01em;
+}
+#oauthSplash .oauth-splash-sub {
+  font-size: 13px;
+  color: #6b665d;
+  line-height: 1.5;
+  max-width: 240px;
+}

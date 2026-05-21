@@ -58,6 +58,35 @@ function toast(text) {
   t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3500);
 }
 
+// ---------- OAuth splash (full-screen "Signing you in") ----------
+function showOAuthSplash(isAuth) {
+  let el = document.getElementById('oauthSplash');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'oauthSplash';
+    el.innerHTML = `
+      <div class="oauth-splash-card">
+        <div class="oauth-spinner"></div>
+        <div class="oauth-splash-title" id="oauthSplashTitle">Signing you in…</div>
+        <div class="oauth-splash-sub" id="oauthSplashSub">Hang tight, finishing up your session</div>
+      </div>`;
+    document.body.appendChild(el);
+  }
+  if (!isAuth) {
+    const t = el.querySelector('#oauthSplashTitle');
+    const s = el.querySelector('#oauthSplashSub');
+    if (t) t.textContent = 'Hmm, that didn\'t work';
+    if (s) s.textContent = 'Sending you back to the login screen…';
+  }
+  // Force reflow before adding open class so transition fires
+  void el.offsetHeight;
+  el.classList.add('open');
+}
+function hideOAuthSplash() {
+  const el = document.getElementById('oauthSplash');
+  if (el) el.classList.remove('open');
+}
+
 // ---------- themes ----------
 const themes = {
   lavender: { bg:'linear-gradient(135deg,#f3e7ff 0%,#ffeef8 50%,#e8e0ff 100%)',
@@ -1038,13 +1067,11 @@ function bootUnauthed() {
         console.error('signOut error', error);
         toast(error.message || 'Sign out failed');
       }
-      // Force unauth state immediately — don't depend on auth listener
+      // Force unauth state immediately — don't depend on auth listener.
+      // Note: supabase-js signOut() already clears its own session keys.
+      // Avoid wiping all sb-* keys ourselves — it can erase a pending PKCE
+      // code_verifier and break a subsequent OAuth sign-in.
       me = null;
-      try {
-        Object.keys(localStorage)
-          .filter(k => k.startsWith('sb-') || k.startsWith('supabase'))
-          .forEach(k => localStorage.removeItem(k));
-      } catch (_) {}
       showScreen('login');
       // Reset login form to a clean state
       const emailIn = document.getElementById('loginEmail');
@@ -1068,26 +1095,51 @@ function bootUnauthed() {
     }
   });
 
-  // Handle OAuth callback (?code=...) — manual PKCE exchange in case auto-detect missed it
+  // Handle OAuth callback (?code=...) — show splash, run PKCE exchange
   const urlObj = new URL(window.location.href);
   const oauthCode = urlObj.searchParams.get('code');
-  if (oauthCode) {
+  const oauthError = urlObj.searchParams.get('error') || urlObj.searchParams.get('error_description');
+
+  if (oauthError) {
+    showOAuthSplash(false);
+    setTimeout(() => {
+      hideOAuthSplash();
+      toast('Sign-in cancelled or failed.');
+      bootUnauthed();
+    }, 600);
+  } else if (oauthCode) {
+    showOAuthSplash(true);
     try {
-      const { data, error } = await window.sb.auth.exchangeCodeForSession(window.location.href);
-      if (error) {
-        console.error('[OAuth] exchange failed:', error);
-        toast('Sign-in failed: ' + error.message);
-      } else if (data && data.session) {
-        // Clean URL (remove ?code & ?state)
-        urlObj.searchParams.delete('code');
-        urlObj.searchParams.delete('state');
-        window.history.replaceState({}, document.title, urlObj.pathname + urlObj.search + urlObj.hash);
-        await bootAuthed(data.session.user);
-        return; // skip the getSession check below; we just booted
+      // detectSessionInUrl might already have consumed the code. Try getSession first.
+      let { data: { session } } = await window.sb.auth.getSession();
+      if (!session) {
+        const res = await window.sb.auth.exchangeCodeForSession(window.location.href);
+        if (res.error) throw res.error;
+        session = res.data && res.data.session;
+      }
+      // Clean URL
+      urlObj.searchParams.delete('code');
+      urlObj.searchParams.delete('state');
+      window.history.replaceState({}, document.title, urlObj.pathname + urlObj.search + urlObj.hash);
+      if (session) {
+        await bootAuthed(session.user);
+        hideOAuthSplash();
+        return;
       }
     } catch (e) {
-      console.error('[OAuth] exchange threw:', e);
+      console.error('[OAuth] exchange failed:', e);
+      const msg = (e.message || '').toLowerCase();
+      const friendly = msg.includes('verifier') || msg.includes('flow state')
+        ? 'Sign-in expired. Please try again.'
+        : 'Sign-in failed: ' + (e.message || 'unknown');
+      hideOAuthSplash();
+      toast(friendly);
+      // Clean URL so the error doesn't loop on refresh
+      urlObj.searchParams.delete('code');
+      urlObj.searchParams.delete('state');
+      window.history.replaceState({}, document.title, urlObj.pathname);
     }
+    hideOAuthSplash();
   }
 
   const session = await PopChatsAuth.getSession();
