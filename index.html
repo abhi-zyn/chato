@@ -614,12 +614,9 @@
 <script src="script.js"></script>
 <script>
 if ('serviceWorker' in navigator) {
-  // Force unregister any broken SW, then re-register the fixed one
+  // Unregister broken SW — do NOT re-register until it's fixed
   navigator.serviceWorker.getRegistrations().then(regs => {
-    const unreg = regs.map(r => r.unregister());
-    Promise.all(unreg).then(() => {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
-    });
+    regs.forEach(r => r.unregister());
   });
 }
 </script>
