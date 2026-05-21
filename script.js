@@ -85,19 +85,26 @@ function hideOAuthSplash() {
 // ---------- themes ----------
 const themes = {
   lavender: { bg:'linear-gradient(135deg,#f3e7ff 0%,#ffeef8 50%,#e8e0ff 100%)',
-              orb1:'rgba(212,196,251,0.8)', orb2:'rgba(248,205,218,0.7)', orb3:'rgba(224,195,252,0.6)' },
+              orb1:'rgba(212,196,251,0.8)', orb2:'rgba(248,205,218,0.7)', orb3:'rgba(224,195,252,0.6)',
+              bar:'#f3e7ff' },
   ocean:    { bg:'linear-gradient(135deg,#e0f7fa 0%,#b2ebf2 50%,#80deea 100%)',
-              orb1:'rgba(128,222,234,0.8)', orb2:'rgba(178,235,242,0.7)', orb3:'rgba(224,247,250,0.6)' },
+              orb1:'rgba(128,222,234,0.8)', orb2:'rgba(178,235,242,0.7)', orb3:'rgba(224,247,250,0.6)',
+              bar:'#e0f7fa' },
   sunset:   { bg:'linear-gradient(135deg,#fff3e0 0%,#ffe0b2 50%,#ffcc80 100%)',
-              orb1:'rgba(255,204,128,0.8)', orb2:'rgba(255,224,178,0.7)', orb3:'rgba(255,243,224,0.6)' },
+              orb1:'rgba(255,204,128,0.8)', orb2:'rgba(255,224,178,0.7)', orb3:'rgba(255,243,224,0.6)',
+              bar:'#fff3e0' },
   offwhite: { bg:'linear-gradient(135deg,#fafaf8 0%,#f5f3ef 50%,#edeae4 100%)',
-              orb1:'rgba(230,225,215,0.7)', orb2:'rgba(240,235,225,0.6)', orb3:'rgba(220,215,205,0.5)' },
+              orb1:'rgba(230,225,215,0.7)', orb2:'rgba(240,235,225,0.6)', orb3:'rgba(220,215,205,0.5)',
+              bar:'#fafaf8' },
   midnight: { bg:'linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)',
-              orb1:'rgba(15,52,96,0.8)', orb2:'rgba(22,33,62,0.7)', orb3:'rgba(26,26,46,0.6)' },
+              orb1:'rgba(15,52,96,0.8)', orb2:'rgba(22,33,62,0.7)', orb3:'rgba(26,26,46,0.6)',
+              bar:'#1a1a2e' },
   rose:     { bg:'linear-gradient(135deg,#fff0f3 0%,#ffd6e0 50%,#ffb3c6 100%)',
-              orb1:'rgba(255,179,198,0.8)', orb2:'rgba(255,214,224,0.7)', orb3:'rgba(255,240,243,0.6)' },
+              orb1:'rgba(255,179,198,0.8)', orb2:'rgba(255,214,224,0.7)', orb3:'rgba(255,240,243,0.6)',
+              bar:'#fff0f3' },
   mint:     { bg:'linear-gradient(135deg,#f0fff4 0%,#c6f6d5 50%,#9ae6b4 100%)',
-              orb1:'rgba(154,230,180,0.8)', orb2:'rgba(198,246,213,0.7)', orb3:'rgba(240,255,244,0.6)' },
+              orb1:'rgba(154,230,180,0.8)', orb2:'rgba(198,246,213,0.7)', orb3:'rgba(240,255,244,0.6)',
+              bar:'#f0fff4' },
 };
 const THEME_STORAGE_KEY = 'popchats.theme';
 
@@ -108,6 +115,9 @@ function applyTheme(name, persist = true) {
   if (orbs[0]) orbs[0].style.background = t.orb1;
   if (orbs[1]) orbs[1].style.background = t.orb2;
   if (orbs[2]) orbs[2].style.background = t.orb3;
+  // Sync mobile status bar / PWA title bar color with theme
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', t.bar);
   document.querySelectorAll('.theme-card').forEach(c =>
     c.classList.toggle('active', c.dataset.theme === name));
   if (persist) {
