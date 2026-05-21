@@ -1974,11 +1974,16 @@ function bootUnauthed() {
   // Auth state
   const hadOAuthCode = !!(new URLSearchParams(window.location.search).get('code'));
   const hadOAuthError = !!(new URLSearchParams(window.location.search).get('error'));
+  let oauthFlowComplete = false;
 
   // Set up listener for FUTURE auth events (sign-in, sign-out, token refresh)
-  // INITIAL_SESSION is handled below via explicit getSession() to avoid races
+  // During OAuth callback, SIGNED_IN fires DURING the code exchange while Supabase
+  // holds an internal lock — calling bootAuthed there causes API calls to hang.
+  // We skip those events and rely on the explicit getSession() path below.
   PopChatsAuth.onAuthChange(async (event, session) => {
     if (event === 'INITIAL_SESSION') return; // handled explicitly below
+    // Skip SIGNED_IN during OAuth flow — wait until explicit boot completes
+    if (hadOAuthCode && !oauthFlowComplete && event === 'SIGNED_IN') return;
     if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
       if (session) await bootAuthed(session.user); else bootUnauthed();
     } else if (event === 'SIGNED_OUT') {
@@ -2029,6 +2034,7 @@ function bootUnauthed() {
     } else {
       bootUnauthed();
     }
+    oauthFlowComplete = true;
     hideOAuthSplash();
   }
 
