@@ -8,8 +8,9 @@ window.PopChatsDB = (function () {
   }
 
   // ---------- profiles ----------
-  async function getMyProfile() {
-    const id = await uid(); if (!id) return null;
+  async function getMyProfile(userId) {
+    const id = userId || await uid(); 
+    if (!id) return null;
     const { data, error } = await client().from('profiles').select('*').eq('id', id).maybeSingle();
     if (error) console.error('[getMyProfile]', error);
     return data;
