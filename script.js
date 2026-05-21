@@ -1526,7 +1526,11 @@ async function bootAuthed(user) {
 
       // 2) Kick off profile + chat list in PARALLEL (both are independent reads)
       const profilePromise = withTimeout(PopChatsDB.getMyProfile(), 8000, 'getMyProfile')
-        .catch(e => { console.error('getMyProfile failed:', e); return null; });
+        .catch(async (e) => {
+          console.error('getMyProfile failed:', e);
+          // Retry once without timeout (SW might have been blocking)
+          try { return await PopChatsDB.getMyProfile(); } catch (_) { return null; }
+        });
       const chatsRenderPromise = loadChatList().catch(e => console.error('loadChatList:', e));
 
       me = await profilePromise;

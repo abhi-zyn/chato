@@ -609,7 +609,13 @@
 <script src="script.js"></script>
 <script>
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(() => {});
+  // Force unregister any broken SW, then re-register the fixed one
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    const unreg = regs.map(r => r.unregister());
+    Promise.all(unreg).then(() => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  });
 }
 </script>
 </body>
