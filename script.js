@@ -1279,7 +1279,9 @@ function openFriendSheet(profile) {
   document.getElementById('friendSheetAvatar').src = avatarOf(profile);
   document.getElementById('friendSheetName').textContent =
     profile.full_name || profile.display_name || profile.username || 'Unknown';
-  document.getElementById('friendSheetHandle').textContent = '@' + (profile.username || '');
+  const handleEl = document.getElementById('friendSheetHandle');
+  handleEl.textContent = '@' + (profile.username || '');
+  handleEl.dataset.userId = profile.id || '';
   const bioEl = document.getElementById('friendSheetBio');
   if (profile.bio && profile.bio.trim()) {
     bioEl.textContent = profile.bio;
@@ -1881,6 +1883,43 @@ function bootUnauthed() {
     } finally {
       signOutBtn.dataset.busy = '0';
     }
+  });
+
+  // Call button handlers
+  document.getElementById('friendSheetCall')?.addEventListener('click', async () => {
+    const friendId = document.getElementById('friendSheetHandle').dataset.userId;
+    if (!friendId) return;
+    closeFriendSheet();
+    await WebRTCCall.startCall(friendId, false);
+  });
+
+  document.getElementById('friendSheetVideo')?.addEventListener('click', async () => {
+    const friendId = document.getElementById('friendSheetHandle').dataset.userId;
+    if (!friendId) return;
+    closeFriendSheet();
+    await WebRTCCall.startCall(friendId, true);
+  });
+
+  document.getElementById('answerCallBtn')?.addEventListener('click', () => {
+    WebRTCCall.answerCall();
+  });
+
+  document.getElementById('declineCallBtn')?.addEventListener('click', () => {
+    WebRTCCall.declineCall();
+  });
+
+  document.getElementById('endCallBtn')?.addEventListener('click', () => {
+    WebRTCCall.endCall();
+  });
+
+  document.getElementById('muteBtn')?.addEventListener('click', (e) => {
+    const enabled = WebRTCCall.toggleMute();
+    e.currentTarget.style.opacity = enabled ? '1' : '0.5';
+  });
+
+  document.getElementById('videoBtn')?.addEventListener('click', (e) => {
+    const enabled = WebRTCCall.toggleVideo();
+    e.currentTarget.style.opacity = enabled ? '1' : '0.5';
   });
 
   // Auth state
