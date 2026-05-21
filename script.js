@@ -191,13 +191,21 @@ async function loadChatList() {
     PopChatsDB.listMyChats().then(chats => {
       _cache.chats = chats;
       renderChatListDOM(chats);
-    }).catch(() => {});
+    }).catch(e => console.error('loadChatList bg:', e));
     return;
   }
   chatList.innerHTML = '<div style="padding:24px;text-align:center;color:#9a9488;font-size:13px;">Loading…</div>';
-  const chats = await PopChatsDB.listMyChats();
-  _cache.chats = chats;
-  renderChatListDOM(chats);
+  try {
+    const chats = await PopChatsDB.listMyChats();
+    _cache.chats = chats;
+    renderChatListDOM(chats);
+  } catch (e) {
+    console.error('loadChatList:', e);
+    chatList.innerHTML =
+      '<div style="padding:30px;text-align:center;color:#9a9488;font-size:13px;line-height:1.6;">' +
+      'Could not load chats.<br/>Pull down to retry.' +
+      '</div>';
+  }
 }
 
 function renderChatListDOM(chats) {
@@ -1573,6 +1581,8 @@ async function bootAuthed(user) {
 function bootUnauthed() {
   me = null;
   bootingAuthed = false;
+  _cache.chats = null;
+  _cache.messages = {};
   if (messageSub) { PopChatsDB.unsubscribe(messageSub); messageSub = null; }
   if (friendActivitySub) { PopChatsDB.unsubscribe(friendActivitySub); friendActivitySub = null; }
   setRequestsBadge(0);
@@ -1828,16 +1838,13 @@ function bootUnauthed() {
     try {
       try { await PopChatsDB.markOnline(false); } catch (_) {}
       try { if (messageSub) { PopChatsDB.unsubscribe(messageSub); messageSub = null; } } catch (_) {}
-      const { error } = await PopChatsAuth.signOut();
-      if (error) {
-        console.error('signOut error', error);
-        toast(error.message || 'Sign out failed');
-      }
-      // Force unauth state immediately — don't depend on auth listener.
-      // Note: supabase-js signOut() already clears its own session keys.
-      // Avoid wiping all sb-* keys ourselves — it can erase a pending PKCE
-      // code_verifier and break a subsequent OAuth sign-in.
+      try { if (friendActivitySub) { PopChatsDB.unsubscribe(friendActivitySub); friendActivitySub = null; } } catch (_) {}
+      await PopChatsAuth.signOut().catch(() => {});
+      // Clear session cache
+      _cache.chats = null;
+      _cache.messages = {};
       me = null;
+      bootingAuthed = false;
       showScreen('login');
       // Reset login form to a clean state
       const emailIn = document.getElementById('loginEmail');

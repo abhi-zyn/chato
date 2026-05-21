@@ -197,12 +197,21 @@ window.PopChatsDB = (function () {
     }
     const profileMap = Object.fromEntries(profiles.map(p => [p.id, p]));
 
-    const { data: msgs } = await client()
+    const { data: msgs, error: msgsErr } = await client()
       .from('messages').select('chat_id,text,text_enc,created_at')
       .in('chat_id', chatIds)
       .order('created_at', { ascending: false });
+    // Fallback if text_enc column doesn't exist yet (migration not run)
+    let msgsList = msgs;
+    if (msgsErr) {
+      const { data: msgs2 } = await client()
+        .from('messages').select('chat_id,text,created_at')
+        .in('chat_id', chatIds)
+        .order('created_at', { ascending: false });
+      msgsList = msgs2;
+    }
     const lastMsg = {};
-    (msgs || []).forEach(m => { if (!lastMsg[m.chat_id]) lastMsg[m.chat_id] = m; });
+    (msgsList || []).forEach(m => { if (!lastMsg[m.chat_id]) lastMsg[m.chat_id] = m; });
 
     // Decrypt previews for any encrypted last-messages (in parallel)
     const encChatIds = Object.entries(lastMsg)
@@ -210,8 +219,10 @@ window.PopChatsDB = (function () {
       .map(([cid]) => cid);
     if (encChatIds.length) {
       await Promise.all(encChatIds.map(async (cid) => {
-        const preview = await lastMessagePreview(cid);
-        if (preview) lastMsg[cid] = { ...lastMsg[cid], text: preview.text };
+        try {
+          const preview = await lastMessagePreview(cid);
+          if (preview) lastMsg[cid] = { ...lastMsg[cid], text: preview.text };
+        } catch (_) {}
       }));
     }
 
@@ -280,19 +291,33 @@ window.PopChatsDB = (function () {
 
   // ---------- messages ----------
   async function listMessages(chatId) {
+    // Try encrypted RPC first; fall back to direct query if migration not run
     const { data, error } = await client().rpc('list_messages_decrypted', { _chat_id: chatId });
-    if (error) { console.error('[listMessages]', error); return []; }
-    return data || [];
+    if (!error) return data || [];
+    console.warn('[listMessages] RPC failed, falling back to direct query:', error.message);
+    const { data: d2, error: e2 } = await client().from('messages')
+      .select('*').eq('chat_id', chatId)
+      .order('created_at', { ascending: true })
+      .limit(200);
+    if (e2) { console.error('[listMessages]', e2); return []; }
+    return d2 || [];
   }
 
   async function sendMessage(chatId, text) {
     const id = await uid(); if (!id) throw new Error('Not signed in');
+    // Try encrypted RPC first; fall back to direct insert if migration not run
     const { data, error } = await client().rpc('send_message_encrypted',
       { _chat_id: chatId, _text: text });
-    if (error) throw error;
-    // RPC returns a row set; take the single row.
-    if (Array.isArray(data) && data.length) return data[0];
-    return data;
+    if (!error) {
+      if (Array.isArray(data) && data.length) return data[0];
+      return data;
+    }
+    console.warn('[sendMessage] RPC failed, falling back to direct insert:', error.message);
+    const { data: d2, error: e2 } = await client().from('messages')
+      .insert({ chat_id: chatId, sender_id: id, text })
+      .select().single();
+    if (e2) throw e2;
+    return d2;
   }
 
   async function decryptMessage(id) {
