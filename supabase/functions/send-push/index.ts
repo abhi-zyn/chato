@@ -102,9 +102,8 @@ Deno.serve(async (req) => {
   const payloadObj: Record<string, string> = {
     c: row.chat_id,
     s: senderName,
-    b: shortPreview(row.text || ''),  // empty string for encrypted rows
+    b: shortPreview(row.text || ''),
   };
-  if (sender.avatar_url) payloadObj.i = sender.avatar_url;
   const data = JSON.stringify(payloadObj);
 
   // 6. Send Web Push to each subscription. Drop subscriptions returning

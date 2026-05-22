@@ -1,5 +1,5 @@
 // PopChats Service Worker — PWA shell cache + Web Push receiver.
-const CACHE_NAME = 'popchats-v5';
+const CACHE_NAME = 'popchats-v6';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -73,13 +73,10 @@ self.addEventListener('push', (e) => {
   const title = data.s || 'PopChats';
   const body = data.b || 'New message';
   const chatId = data.c || '';
-  const icon = data.i || 'https://popchats.zenvx.in/icon-192.png';
 
   e.waitUntil(
     self.registration.showNotification(title, {
       body,
-      icon,
-      badge: 'https://popchats.zenvx.in/icon-192.png',
       tag: chatId ? 'popchats-chat-' + chatId : 'popchats-msg',
       renotify: true,
       data: { chatId, url: chatId ? `/?chat=${encodeURIComponent(chatId)}` : '/' },
