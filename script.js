@@ -2878,6 +2878,18 @@ function bootUnauthed() {
     await WebRTCCall.startCall(friend, true);
   });
 
+  document.getElementById('convCallBtn')?.addEventListener('click', async () => {
+    if (!activeChat || !activeChat.other) { toast('No active conversation'); return; }
+    if (!window.WebRTCCall) { toast('Calling not available — WebRTC module failed to load'); return; }
+    await WebRTCCall.startCall(activeChat.other, false);
+  });
+
+  document.getElementById('convVideoBtn')?.addEventListener('click', async () => {
+    if (!activeChat || !activeChat.other) { toast('No active conversation'); return; }
+    if (!window.WebRTCCall) { toast('Calling not available — WebRTC module failed to load'); return; }
+    await WebRTCCall.startCall(activeChat.other, true);
+  });
+
   document.getElementById('answerCallBtn')?.addEventListener('click', () => {
     WebRTCCall.answerCall();
   });
