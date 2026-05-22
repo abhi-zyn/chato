@@ -642,6 +642,45 @@ window.PopChatsDB = (function () {
     if (ch) client().removeChannel(ch);
   }
 
+  // ---------- read receipts (Seen indicator) ----------
+  async function markChatRead(chatId) {
+    if (!chatId) return null;
+    try {
+      const { data, error } = await client().rpc('mark_chat_read', { _chat_id: chatId });
+      if (error) { console.error('[markChatRead]', error); return null; }
+      return data; // timestamptz string
+    } catch (e) { console.error('[markChatRead]', e); return null; }
+  }
+
+  // Returns { [user_id]: last_read_at_iso }
+  async function getChatReadStates(chatId) {
+    if (!chatId) return {};
+    try {
+      const { data, error } = await client().rpc('chat_read_states', { _chat_id: chatId });
+      if (error) { console.error('[chat_read_states]', error); return {}; }
+      const out = {};
+      (data || []).forEach(r => { out[r.user_id] = r.last_read_at; });
+      return out;
+    } catch (e) { console.error('[chat_read_states]', e); return {}; }
+  }
+
+  // Subscribe to chat_members UPDATE events for a single chat.
+  // Fires when any member's last_read_at changes (i.e. they opened the chat).
+  function subscribeToChatReads(chatId, onUpdate) {
+    const ch = client()
+      .channel('chat-reads:' + chatId)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'chat_members', filter: 'chat_id=eq.' + chatId },
+        (payload) => {
+          const row = payload && payload.new;
+          if (row && row.user_id) onUpdate(row);
+        }
+      )
+      .subscribe();
+    return ch;
+  }
+
   // ---------- notifications / calls (history) ----------
   async function listNotifications() {
     const id = await uid(); if (!id) return [];
@@ -672,6 +711,7 @@ window.PopChatsDB = (function () {
     getOrCreateDM, startStrangerChat, pickRandomStranger,
     listMessages, sendMessage, subscribeToChat, subscribeToAllMyMessages, startMessagePolling, unsubscribe,
     decryptMessage, lastMessagePreview,
+    markChatRead, getChatReadStates, subscribeToChatReads,
     listNotifications, listCalls
   };
 })();

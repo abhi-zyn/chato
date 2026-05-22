@@ -25,6 +25,7 @@ const chatList = document.getElementById('chatList');
 let me = null;          // current profile row from public.profiles
 let activeChat = null;  // { id, other }
 let messageSub = null;  // realtime channel for active chat
+let chatReadsSub = null; // realtime channel for chat_members updates (Seen)
 let allMessagesSub = null; // global realtime channel for ALL my chats
 let messagePoller = null;  // polling fallback handle
 let friendActivitySub = null;  // realtime channel for friend requests
@@ -32,7 +33,52 @@ let onlineHeartbeatId = null;  // setInterval id for online heartbeat
 let presenceWatcherId = null;  // setInterval id for refreshing other users' online status
 let pendingRequestCount = 0;   // incoming pending requests, for badge
 let activeRequestTab = 'incoming';
+let otherLastReadAt = null;    // ISO timestamp of when the other user last read activeChat
+let convHeaderTickId = null;   // setInterval to keep "last seen X ago" fresh
 const _seenMessageIds = new Set(); // dedupe between realtime + polling
+
+// ---------- Time formatting helpers ----------
+// Returns a short human-readable status for the conv header / chat cards.
+// "Online" when the user is online, otherwise "last seen X ago".
+function formatPresenceStatus(other) {
+  if (!other) return '';
+  if (other.online) return 'Online';
+  return formatLastSeen(other.last_seen);
+}
+
+function formatLastSeen(iso) {
+  if (!iso) return 'Offline';
+  const t = new Date(iso).getTime();
+  if (!t || isNaN(t)) return 'Offline';
+  const diffMs = Date.now() - t;
+  if (diffMs < 60 * 1000) return 'last seen just now';
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 60) return `last seen ${mins} min${mins === 1 ? '' : 's'} ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `last seen ${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `last seen ${days} day${days === 1 ? '' : 's'} ago`;
+  // For older, fall back to a date
+  try {
+    return 'last seen ' + new Date(iso).toLocaleDateString(undefined,
+      { month: 'short', day: 'numeric' });
+  } catch (_) { return 'Offline'; }
+}
+
+function updateConvHeaderStatus() {
+  if (!convSt || !activeChat || !activeChat.other) return;
+  convSt.textContent = formatPresenceStatus(activeChat.other);
+}
+
+function startConvHeaderTick() {
+  stopConvHeaderTick();
+  // Refresh the "last seen X ago" string every 30s while a chat is open
+  convHeaderTickId = setInterval(updateConvHeaderStatus, 30000);
+}
+function stopConvHeaderTick() {
+  if (convHeaderTickId) { clearInterval(convHeaderTickId); convHeaderTickId = null; }
+}
+
 
 // Online heartbeat — keeps last_seen fresh while tab is open
 function startOnlineHeartbeat() {
@@ -93,7 +139,7 @@ async function refreshPresence() {
       const p = presence[activeChat.other.id];
       activeChat.other.online = p.online;
       activeChat.other.last_seen = p.last_seen;
-      if (convSt) convSt.textContent = p.online ? 'Online' : 'Offline';
+      updateConvHeaderStatus();
       const friendBtn = document.getElementById('convFriendBtn');
       if (friendBtn) friendBtn.setAttribute('data-online', p.online ? 'true' : 'false');
     }
@@ -579,7 +625,10 @@ async function openChat(chatId, otherProfile, isStranger) {
     other = members.find(m => m.id !== (me && me.id)) || null;
   }
   activeChat = { id: chatId, other, isStranger: !!isStranger, friendState: 'none' };
-  
+
+  // Reset Seen state for the new chat
+  otherLastReadAt = null;
+
   // Clear unread count for this chat
   _unread.clear(chatId);
   // Advance the per-chat read pointer to "now" so any historical messages
@@ -587,17 +636,50 @@ async function openChat(chatId, otherProfile, isStranger) {
   _readState.mark(chatId, new Date().toISOString());
   updateChatCardUnread(chatId);
   updateGlobalUnreadBadge();
-  
+
   convAv.src = avatarOf(other);
   convAv.alt = other ? (other.full_name || other.display_name || other.username) : '';
   convNm.textContent = other ? (other.full_name || other.display_name || other.username) : 'Unknown';
-  convSt.textContent = other && other.online ? 'Online' : 'Offline';
+  if (convSt) convSt.textContent = formatPresenceStatus(other);
   const friendBtn = document.getElementById('convFriendBtn');
   if (friendBtn) friendBtn.setAttribute('data-online', other && other.online ? 'true' : 'false');
   showScreen('conv');
   await renderMessages(chatId);
   if (messageSub) { PopChatsDB.unsubscribe(messageSub); messageSub = null; }
-  messageSub = PopChatsDB.subscribeToChat(chatId, (m) => appendMessage(m));
+  messageSub = PopChatsDB.subscribeToChat(chatId, (m) => {
+    appendMessage(m);
+    // Any incoming message I see while in this chat — mark as read on the server
+    // so the sender can update their Seen indicator.
+    if (me && m.sender_id !== me.id) {
+      PopChatsDB.markChatRead(chatId).catch(() => {});
+    }
+  });
+
+  // Read receipts: tell the server I just opened this chat, then subscribe
+  // to other members' read updates so the Seen indicator is live.
+  PopChatsDB.markChatRead(chatId).catch(() => {});
+  if (chatReadsSub) { PopChatsDB.unsubscribe(chatReadsSub); chatReadsSub = null; }
+  chatReadsSub = PopChatsDB.subscribeToChatReads(chatId, (row) => {
+    if (!me || row.user_id === me.id) return; // ignore my own reads
+    if (!activeChat || activeChat.id !== chatId) return;
+    otherLastReadAt = row.last_read_at;
+    renderSeenIndicator();
+  });
+  // Initial fetch of all members' read state
+  PopChatsDB.getChatReadStates(chatId).then(states => {
+    if (!activeChat || activeChat.id !== chatId) return;
+    Object.entries(states).forEach(([uid, ts]) => {
+      if (me && uid !== me.id) {
+        if (!otherLastReadAt || new Date(ts) > new Date(otherLastReadAt)) {
+          otherLastReadAt = ts;
+        }
+      }
+    });
+    renderSeenIndicator();
+  }).catch(() => {});
+
+  // Keep the "last seen X ago" string fresh while the chat is open
+  startConvHeaderTick();
 
   // Determine friendship state to gate input and show banner
   await refreshConvFriendGate();
@@ -731,6 +813,7 @@ async function renderMessages(chatId) {
   if (cached && cached.length) {
     cached.forEach((m, i) => appendMessage(m, false, i));
     requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
+    renderSeenIndicator();
     // Background refresh — but DON'T clear messages on transient failure
     PopChatsDB.listMessages(chatId).then(list => {
       // If fetch returned empty/null, don't clobber cached messages
@@ -743,6 +826,7 @@ async function renderMessages(chatId) {
         msgBox.innerHTML = '';
         list.forEach((m, i) => appendMessage(m, false, i));
         requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
+        renderSeenIndicator();
       }
     }).catch(e => console.error('renderMessages bg:', e));
   } else {
@@ -751,6 +835,7 @@ async function renderMessages(chatId) {
     _cache.saveMessages();
     list.forEach((m, i) => appendMessage(m, false, i));
     requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
+    renderSeenIndicator();
   }
 }
 
@@ -786,6 +871,35 @@ function appendMessage(m, animate = true, idx = 0) {
   requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
   // Keep cache in sync for realtime messages
   if (animate) cacheMessageIfMissing(m);
+  renderSeenIndicator();
+}
+
+// Render the "Seen" indicator under the user's last sent message in the
+// current chat. Removes the indicator if no read receipt is available or if
+// the recipient hasn't read up to my latest sent message yet.
+function renderSeenIndicator() {
+  if (!msgBox || !activeChat || !me) return;
+  // Remove any existing indicator first
+  const old = msgBox.querySelector('.msg-seen');
+  if (old) old.remove();
+  if (!otherLastReadAt) return;
+  // Find the last "sent" message (from me) in DOM order
+  const sentRows = msgBox.querySelectorAll('.msg-row.sent');
+  if (!sentRows.length) return;
+  const lastSent = sentRows[sentRows.length - 1];
+  // Determine the timestamp of that message from cache
+  const cachedList = (_cache.messages && _cache.messages[activeChat.id]) || [];
+  // Match by DOM id → message id (rows use id="msg-<id>")
+  const domId = lastSent.id || '';
+  const msgId = domId.startsWith('msg-') ? domId.slice(4) : '';
+  const lastMsg = cachedList.find(x => x.id === msgId);
+  if (!lastMsg || !lastMsg.created_at) return;
+  if (new Date(otherLastReadAt) >= new Date(lastMsg.created_at)) {
+    const tag = document.createElement('div');
+    tag.className = 'msg-seen';
+    tag.textContent = 'Seen';
+    lastSent.appendChild(tag);
+  }
 }
 
 // Persist a message into the per-chat localStorage cache if not already there.
@@ -838,6 +952,10 @@ async function sendMsg() {
     `<div class="msg-time">${formatTime(new Date().toISOString())}</div>`;
   msgBox.appendChild(r);
   requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
+  // The previous "Seen" tag belonged to an older message — refresh now so it
+  // disappears the moment the new message appears (it'll come back once the
+  // recipient reads up to this new message).
+  renderSeenIndicator();
   // Settle the pop highlight after the animation
   setTimeout(() => r.classList.add('settled'), 500);
 
@@ -861,6 +979,9 @@ async function sendMsg() {
       // background listMessages — never makes the just-sent message
       // disappear from the UI.
       cacheMessageIfMissing(saved);
+      // Refresh the Seen indicator now that the optimistic row has a real id
+      // and is in the cache (so it can be matched by id).
+      renderSeenIndicator();
       // Also mark our read pointer so polling fallback doesn't re-bump.
       try { _readState && _readState.mark(sendingChatId, saved.created_at); } catch (_) {}
     }
@@ -2106,9 +2227,13 @@ function bootUnauthed() {
   _cache.chats = null;
   _cache.messages = {};
   if (messageSub) { PopChatsDB.unsubscribe(messageSub); messageSub = null; }
+  if (chatReadsSub) { PopChatsDB.unsubscribe(chatReadsSub); chatReadsSub = null; }
+  stopConvHeaderTick();
   if (friendActivitySub) { PopChatsDB.unsubscribe(friendActivitySub); friendActivitySub = null; }
   if (allMessagesSub) { PopChatsDB.unsubscribe(allMessagesSub); allMessagesSub = null; }
   if (messagePoller) { messagePoller.cancel(); messagePoller = null; }
+  activeChat = null;
+  otherLastReadAt = null;
   // Clear per-user unread/read state so a different account on the same device
   // doesn't inherit stale badges or read pointers.
   try {
@@ -2141,6 +2266,10 @@ function bootUnauthed() {
   // Back buttons
   document.getElementById('backBtn').addEventListener('click', () => {
     if (messageSub) { PopChatsDB.unsubscribe(messageSub); messageSub = null; }
+    if (chatReadsSub) { PopChatsDB.unsubscribe(chatReadsSub); chatReadsSub = null; }
+    stopConvHeaderTick();
+    activeChat = null;
+    otherLastReadAt = null;
     showScreen('chats', 'chats');
     loadChatList();
   });
@@ -2650,6 +2779,10 @@ function bootUnauthed() {
     } else {
       PopChatsDB.markOnline(true).catch(() => {});
       refreshPresence(); // immediate refresh of other users' status
+      // Re-mark the active chat read so the sender sees an up-to-date Seen
+      if (activeChat && activeChat.id) {
+        PopChatsDB.markChatRead(activeChat.id).catch(() => {});
+      }
     }
   });
 
