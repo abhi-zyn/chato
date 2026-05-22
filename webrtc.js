@@ -409,17 +409,19 @@ window.WebRTCCall = (function () {
       window.sb.from('signaling').delete().eq('room_id', roomId).then(() => {}).catch(() => {});
     }
 
-    // Log call to database
-    if (wasInCall && callMeta && callMeta.friendId) {
+    // Log call to database (only initiator logs to avoid duplicates)
+    if (wasInCall && callMeta && callMeta.friendId && callMeta.initiator) {
       const myId = getMyUserId();
       if (myId) {
         const kind = callMeta.answered ? (callMeta.video ? 'video' : 'voice') : 'missed';
         const row = {
-          caller_id: callMeta.initiator ? myId : callMeta.friendId,
-          callee_id: callMeta.initiator ? callMeta.friendId : myId,
+          caller_id: myId,
+          callee_id: callMeta.friendId,
           kind
         };
-        window.sb.from('calls').insert(row).then(() => {}).catch(e => console.warn('[call log]', e));
+        window.sb.from('calls').insert(row).then(({ error }) => {
+          if (error) console.error('[call log] insert failed:', error.message);
+        }).catch(e => console.error('[call log]', e));
       }
     }
 
