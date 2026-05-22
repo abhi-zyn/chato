@@ -712,6 +712,19 @@ window.PopChatsDB = (function () {
     if (error) console.error('[deletePushSubscription]', error);
   }
 
+  // Lightweight check: does this user have at least one push subscription
+  // registered? Used by the sender to decide whether to show the "delivered"
+  // double tick when the recipient is offline. Goes via SECURITY DEFINER RPC
+  // because the push_subscriptions table is RLS-locked to its owner.
+  async function userHasPushSubscription(userId) {
+    if (!userId) return false;
+    try {
+      const { data, error } = await client().rpc('user_has_push', { _user_id: userId });
+      if (error) return false;
+      return data === true;
+    } catch (_) { return false; }
+  }
+
 
   // ---------- notifications / calls (history) ----------
   async function listNotifications() {
@@ -744,7 +757,7 @@ window.PopChatsDB = (function () {
     listMessages, sendMessage, subscribeToChat, subscribeToAllMyMessages, startMessagePolling, unsubscribe,
     decryptMessage, lastMessagePreview,
     markChatRead, getChatReadStates, subscribeToChatReads,
-    savePushSubscription, deletePushSubscription,
+    savePushSubscription, deletePushSubscription, userHasPushSubscription,
     listNotifications, listCalls
   };
 })();

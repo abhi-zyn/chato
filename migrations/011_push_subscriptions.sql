@@ -49,3 +49,39 @@ as $$
 $$;
 
 grant execute on function public.chat_other_members(uuid, uuid) to authenticated, service_role;
+
+-- ---------- user_has_push: tiny helper for the sender's UI ----------
+-- Lets a chat member ask "does my chat partner have any push subscription
+-- registered?" without exposing the actual endpoints. Returns a single
+-- boolean; the caller must be authenticated and chat with the target.
+create or replace function public.user_has_push(_user_id uuid)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  hit boolean;
+begin
+  if auth.uid() is null then return false; end if;
+  -- Must share at least one chat with the target — prevents random users
+  -- from probing arbitrary accounts.
+  if not exists (
+    select 1
+      from public.chat_members a
+      join public.chat_members b on a.chat_id = b.chat_id
+     where a.user_id = auth.uid() and b.user_id = _user_id
+  ) then
+    return false;
+  end if;
+
+  select exists (
+    select 1 from public.push_subscriptions where user_id = _user_id
+  ) into hit;
+  return coalesce(hit, false);
+end;
+$$;
+
+grant execute on function public.user_has_push(uuid) to authenticated;
+

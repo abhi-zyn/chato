@@ -34,8 +34,8 @@ let presenceWatcherId = null;  // setInterval id for refreshing other users' onl
 let pendingRequestCount = 0;   // incoming pending requests, for badge
 let activeRequestTab = 'incoming';
 let otherLastReadAt = null;    // ISO timestamp of when the other user last read activeChat
+let otherHasPush = false;      // does the recipient have any push subscription?
 let convHeaderTickId = null;   // setInterval to keep "last seen X ago" fresh
-const _seenMessageIds = new Set(); // dedupe between realtime + polling
 
 // ---------- Time formatting helpers ----------
 // Returns a short human-readable status for the conv header / chat cards.
@@ -142,6 +142,9 @@ async function refreshPresence() {
       updateConvHeaderStatus();
       const friendBtn = document.getElementById('convFriendBtn');
       if (friendBtn) friendBtn.setAttribute('data-online', p.online ? 'true' : 'false');
+      // Recipient's online state changed — re-evaluate ticks (sent → delivered
+      // when they come online, etc.).
+      applyReadReceipts();
     }
   } catch (e) {
     console.error('[refreshPresence]', e);
@@ -293,25 +296,25 @@ function hideOAuthSplash() {
 const themes = {
   lavender: { bg:'linear-gradient(135deg,#f3e7ff 0%,#ffeef8 50%,#e8e0ff 100%)',
               orb1:'rgba(212,196,251,0.8)', orb2:'rgba(248,205,218,0.7)', orb3:'rgba(224,195,252,0.6)',
-              bar:'#f3e7ff' },
+              bar:'#f3e7ff', readTick:'#8e24aa' },
   ocean:    { bg:'linear-gradient(135deg,#e0f7fa 0%,#b2ebf2 50%,#80deea 100%)',
               orb1:'rgba(128,222,234,0.8)', orb2:'rgba(178,235,242,0.7)', orb3:'rgba(224,247,250,0.6)',
-              bar:'#e0f7fa' },
+              bar:'#e0f7fa', readTick:'#0288d1' },
   sunset:   { bg:'linear-gradient(135deg,#fff3e0 0%,#ffe0b2 50%,#ffcc80 100%)',
               orb1:'rgba(255,204,128,0.8)', orb2:'rgba(255,224,178,0.7)', orb3:'rgba(255,243,224,0.6)',
-              bar:'#fff3e0' },
+              bar:'#fff3e0', readTick:'#ef6c00' },
   offwhite: { bg:'linear-gradient(135deg,#fafaf8 0%,#f5f3ef 50%,#edeae4 100%)',
               orb1:'rgba(230,225,215,0.7)', orb2:'rgba(240,235,225,0.6)', orb3:'rgba(220,215,205,0.5)',
-              bar:'#fafaf8' },
+              bar:'#fafaf8', readTick:'#3949ab' },
   midnight: { bg:'linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)',
               orb1:'rgba(15,52,96,0.8)', orb2:'rgba(22,33,62,0.7)', orb3:'rgba(26,26,46,0.6)',
-              bar:'#1a1a2e' },
+              bar:'#1a1a2e', readTick:'#64b5f6' },
   rose:     { bg:'linear-gradient(135deg,#fff0f3 0%,#ffd6e0 50%,#ffb3c6 100%)',
               orb1:'rgba(255,179,198,0.8)', orb2:'rgba(255,214,224,0.7)', orb3:'rgba(255,240,243,0.6)',
-              bar:'#fff0f3' },
+              bar:'#fff0f3', readTick:'#d81b60' },
   mint:     { bg:'linear-gradient(135deg,#f0fff4 0%,#c6f6d5 50%,#9ae6b4 100%)',
               orb1:'rgba(154,230,180,0.8)', orb2:'rgba(198,246,213,0.7)', orb3:'rgba(240,255,244,0.6)',
-              bar:'#f0fff4' },
+              bar:'#f0fff4', readTick:'#2e7d32' },
 };
 const THEME_STORAGE_KEY = 'popchats.theme';
 
@@ -325,6 +328,8 @@ function applyTheme(name, persist = true) {
   // Sync mobile status bar / PWA title bar color with theme
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', t.bar);
+  // Theme-oriented "read" tick color (CSS var picked up by .tick-read).
+  if (t.readTick) document.documentElement.style.setProperty('--read-tick', t.readTick);
   document.querySelectorAll('.theme-card').forEach(c =>
     c.classList.toggle('active', c.dataset.theme === name));
   if (persist) {
@@ -476,17 +481,40 @@ function updateGlobalUnreadBadge() {
   document.title = total > 0 ? `(${total}) PopChats` : 'PopChats';
 }
 
+const _SEEN_LS_KEY = 'popchats.seenMsgs';
+const _SEEN_MAX = 500;
+
+function _loadSeenIds() {
+  try {
+    const raw = localStorage.getItem(_SEEN_LS_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr.slice(-_SEEN_MAX) : []);
+  } catch (_) { return new Set(); }
+}
+function _persistSeenIds() {
+  try {
+    // Sliding window — keep at most _SEEN_MAX recent entries.
+    const arr = Array.from(_seenMessageIds);
+    const slice = arr.length > _SEEN_MAX ? arr.slice(arr.length - _SEEN_MAX) : arr;
+    localStorage.setItem(_SEEN_LS_KEY, JSON.stringify(slice));
+  } catch (_) {}
+}
+const _seenMessageIds = _loadSeenIds(); // dedupe across refreshes too
+
 // Handle incoming message from global realtime subscription
 function handleIncomingMessage(msg) {
   if (!msg || !msg.chat_id || !msg.sender_id || !msg.id) return;
-  // Dedupe: realtime + polling may both deliver the same message
+  // Dedupe: realtime + polling may both deliver the same message AND a
+  // page refresh would otherwise replay history and bump unread again.
   if (_seenMessageIds.has(msg.id)) return;
   _seenMessageIds.add(msg.id);
   // Keep set bounded
-  if (_seenMessageIds.size > 500) {
+  if (_seenMessageIds.size > _SEEN_MAX) {
     const arr = Array.from(_seenMessageIds);
-    arr.slice(0, 250).forEach(id => _seenMessageIds.delete(id));
+    arr.slice(0, arr.length - _SEEN_MAX).forEach(id => _seenMessageIds.delete(id));
   }
+  _persistSeenIds();
 
   // My own messages: just advance read pointer; never count as unread.
   if (me && msg.sender_id === me.id) {
@@ -785,6 +813,7 @@ async function openChat(chatId, otherProfile, isStranger) {
 
   // Reset Seen state for the new chat
   otherLastReadAt = null;
+  otherHasPush = false;
 
   // Clear unread count for this chat
   _unread.clear(chatId);
@@ -832,8 +861,20 @@ async function openChat(chatId, otherProfile, isStranger) {
         }
       }
     });
-    renderSeenIndicator();
+    applyReadReceipts();
   }).catch(() => {});
+
+  // Find out if the recipient has a push subscription registered. Used by
+  // applyReadReceipts to decide whether messages count as "delivered" when
+  // the recipient is currently offline (a registered device is reachable
+  // even when the user isn't actively online).
+  if (other && other.id) {
+    PopChatsDB.userHasPushSubscription(other.id).then(has => {
+      if (!activeChat || !activeChat.other || activeChat.other.id !== other.id) return;
+      otherHasPush = !!has;
+      applyReadReceipts();
+    }).catch(() => {});
+  }
 
   // Keep the "last seen X ago" string fresh while the chat is open
   startConvHeaderTick();
@@ -1018,9 +1059,10 @@ function appendMessage(m, animate = true, idx = 0) {
       pending.id = 'msg-' + m.id;
       pending.removeAttribute('data-pending');
       pending.removeAttribute('data-pending-text');
-      // Server confirmed → upgrade tick to delivered (re-evaluated against
-      // the recipient's read pointer below).
-      setTickState(pending, 'delivered');
+      // Server confirmed the message exists. The actual tick state will be
+      // resolved (sent / delivered / read) by applyReadReceipts based on the
+      // recipient's reachability and read pointer.
+      setTickState(pending, 'sent');
       cacheMessageIfMissing(m);
       applyReadReceipts();
       return;
@@ -1030,16 +1072,17 @@ function appendMessage(m, animate = true, idx = 0) {
   r.id = 'msg-' + m.id;
   r.className = 'msg-row ' + (isMine ? 'sent' : 'received');
   if (animate) r.style.animationDelay = (idx * 0.05) + 's';
-  // Initial tick state for sent messages = delivered (server confirmed it
-  // exists since we got the row). applyReadReceipts() may upgrade it to read.
-  const tickHTML = isMine ? tickSvg('delivered') : '';
+  // Initial tick state for sent messages = 'sent' (single tick). The state
+  // machine in applyReadReceipts upgrades to 'delivered' or 'read' based on
+  // recipient reachability + read pointer.
+  const tickHTML = isMine ? tickSvg('sent') : '';
   r.innerHTML =
     `<div class="msg-bubble">${escapeHtml(m.text)}</div>` +
     `<div class="msg-time">` +
       `<span class="msg-time-text">${formatTime(m.created_at)}</span>` +
       tickHTML +
     `</div>`;
-  if (isMine) r.setAttribute('data-tick', 'delivered');
+  if (isMine) r.setAttribute('data-tick', 'sent');
   msgBox.appendChild(r);
   requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
   // Keep cache in sync for realtime messages
@@ -1079,14 +1122,21 @@ function setTickState(rowEl, state) {
 }
 
 // Walk all of my sent messages in the active chat and set each tick to
-// 'read' if otherLastReadAt covers it, otherwise 'delivered'. (Pending /
-// optimistic rows keep 'sent' until sendMsg upgrades them.)
+// 'read' if otherLastReadAt covers it, 'delivered' if the recipient is
+// reachable (online or has a push subscription), otherwise 'sent'.
+// Pending / optimistic rows keep 'sent' until sendMsg upgrades them.
 function applyReadReceipts() {
   if (!msgBox || !activeChat || !me) return;
   const cachedList = (_cache.messages && _cache.messages[activeChat.id]) || [];
   const byId = {};
   cachedList.forEach(x => { byId[x.id] = x; });
   const readBoundary = otherLastReadAt ? new Date(otherLastReadAt).getTime() : 0;
+  // Recipient is "reachable" if currently online or has any push subscription.
+  // Otherwise the message is sent but not yet known to be delivered.
+  const otherOnline = !!(activeChat.other && activeChat.other.online);
+  const reachable = otherOnline || otherHasPush;
+  const deliveredState = reachable ? 'delivered' : 'sent';
+
   msgBox.querySelectorAll('.msg-row.sent').forEach(row => {
     // Skip optimistic pending rows — they keep their 'sent' tick until the
     // send RPC resolves and upgrades them.
@@ -1095,12 +1145,16 @@ function applyReadReceipts() {
     const msgId = domId.startsWith('msg-') ? domId.slice(4) : '';
     const m = byId[msgId];
     if (!m || !m.created_at) {
-      // Unknown timing — leave at delivered if it's already been confirmed
-      if (row.getAttribute('data-tick') !== 'read') setTickState(row, 'delivered');
+      // Unknown timing — never downgrade a row that's already at 'read'.
+      if (row.getAttribute('data-tick') !== 'read') setTickState(row, deliveredState);
       return;
     }
     const created = new Date(m.created_at).getTime();
-    setTickState(row, readBoundary && created <= readBoundary ? 'read' : 'delivered');
+    if (readBoundary && created <= readBoundary) {
+      setTickState(row, 'read');
+    } else {
+      setTickState(row, deliveredState);
+    }
   });
 }
 
@@ -1184,15 +1238,16 @@ async function sendMsg() {
         r.id = 'msg-' + saved.id;
         r.removeAttribute('data-pending');
         r.removeAttribute('data-pending-text');
-        // Server confirmed → upgrade single tick to delivered double-tick.
-        setTickState(r, 'delivered');
+        // Server confirmed the row. Default to 'sent' here — the state
+        // machine in applyReadReceipts() upgrades to 'delivered' if the
+        // recipient is reachable, or 'read' if they've already read it.
+        setTickState(r, 'sent');
       }
       // Persist to the per-chat cache so a refresh — or a slow/failing
       // background listMessages — never makes the just-sent message
       // disappear from the UI.
       cacheMessageIfMissing(saved);
-      // Refresh tick states now that the new message is in the cache (so
-      // applyReadReceipts can match its timestamp against otherLastReadAt).
+      // Resolve the proper tick state for this and any prior rows.
       applyReadReceipts();
       // Also mark our read pointer so polling fallback doesn't re-bump.
       try { _readState && _readState.mark(sendingChatId, saved.created_at); } catch (_) {}
@@ -2459,7 +2514,9 @@ function bootUnauthed() {
     localStorage.removeItem('popchats.unread');
     localStorage.removeItem('popchats.lastRead');
     localStorage.removeItem('popchats.poll.lastSeenAt');
+    localStorage.removeItem('popchats.seenMsgs');
   } catch (_) {}
+  _seenMessageIds.clear();
   stopOnlineHeartbeat();
   stopPresenceWatcher();
   if (window.WebRTCCall && WebRTCCall.stopInboundListener) {
