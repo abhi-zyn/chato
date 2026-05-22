@@ -2597,6 +2597,8 @@ function bootUnauthed() {
       t.classList.toggle('active', t.dataset.rtab === 'incoming'));
     loadRequestsScreen();
   });
+  const openNotif = document.getElementById('openNotificationsBtn');
+  if (openNotif) openNotif.addEventListener('click', () => navTo('notifications'));
   const reqBack = document.getElementById('requestsBackBtn');
   if (reqBack) reqBack.addEventListener('click', () => showScreen('chats', 'chats'));
   document.querySelectorAll('.req-tab').forEach(tab => {
