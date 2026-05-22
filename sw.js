@@ -1,5 +1,5 @@
 // PopChats Service Worker — PWA shell cache + Web Push receiver.
-const CACHE_NAME = 'popchats-v3';
+const CACHE_NAME = 'popchats-v4';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -60,31 +60,30 @@ self.addEventListener('fetch', (e) => {
 });
 
 // ---------- Web Push ----------
-// Tiny payload: { c: chatId, s: senderName, b: bodyPreview }
+// Tiny payload: { c: chatId, s: senderName, b: bodyPreview, i: avatarUrl }
 self.addEventListener('push', (e) => {
   let data = {};
-  try { data = e.data ? e.data.json() : {}; } catch (_) { data = {}; }
+  try { data = e.data ? e.data.json() : {}; } catch (_) {}
 
   const senderName = data.s || 'PopChats';
   const body = data.b || 'sent you a message';
   const chatId = data.c || '';
   const icon = data.i || '/icon-192.png';
 
-  e.waitUntil(
-    self.registration.showNotification(senderName, {
-      body,
-      icon,
-      badge: '/icon-192.png',
-      tag: chatId ? 'popchats-chat-' + chatId : 'popchats-msg',
-      renotify: false,
-      // Keep the notification visible until the user interacts with it.
-      // Without this, most desktop browsers auto-dismiss after a few seconds.
-      requireInteraction: true,
-      // Click target — we use the URL hash so the page can route to the chat
-      // without a server roundtrip.
-      data: { chatId, url: chatId ? `/?chat=${encodeURIComponent(chatId)}` : '/' },
-    })
-  );
+  const notifPromise = self.registration.showNotification(senderName, {
+    body,
+    icon,
+    badge: '/icon-192.png',
+    tag: chatId ? 'popchats-chat-' + chatId : 'popchats-msg',
+    renotify: true,
+    requireInteraction: true,
+    data: { chatId, url: chatId ? `/?chat=${encodeURIComponent(chatId)}` : '/' },
+  }).catch(() => {
+    // Fallback: show a plain notification so Chrome doesn't show the generic one
+    return self.registration.showNotification('PopChats', { body: 'New message' });
+  });
+
+  e.waitUntil(notifPromise);
 });
 
 self.addEventListener('notificationclick', (e) => {
