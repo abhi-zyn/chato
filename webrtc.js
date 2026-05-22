@@ -415,7 +415,7 @@ window.WebRTCCall = (function () {
     if (wasInCall && callMeta && callMeta.friendId) {
       const myId = getMyUserId();
       if (myId) {
-        const kind = callMeta.answered ? (callMeta.video ? 'video' : 'voice') : 'missed';
+        const kind = callMeta.answered ? 'voice' : 'missed';
         const caller = callMeta.initiator ? myId : callMeta.friendId;
         const callee = callMeta.initiator ? callMeta.friendId : myId;
         console.log('[call log] saving:', { caller, callee, kind });
