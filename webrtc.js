@@ -194,6 +194,7 @@ window.WebRTCCall = (function () {
     conn.onconnectionstatechange = () => {
       console.log('[pc] state:', conn.connectionState);
       if (conn.connectionState === 'connected') {
+        if (currentCall) currentCall._answered = true;
         showCallUI('active');
       } else if (conn.connectionState === 'failed' ||
                  conn.connectionState === 'disconnected' ||
@@ -365,6 +366,7 @@ window.WebRTCCall = (function () {
 
   function declineCall() {
     if (currentCall && !currentCall.initiator) {
+      currentCall._declined = true;
       sendSignal(currentCall.roomId, 'bye', { reason: 'declined' });
     }
     endCall();
@@ -373,6 +375,13 @@ window.WebRTCCall = (function () {
   async function endCall() {
     const wasInCall = !!currentCall;
     const roomId = currentCall && currentCall.roomId;
+    const callMeta = currentCall ? {
+      initiator: currentCall.initiator,
+      friendId: currentCall.friendId,
+      answered: !!currentCall._answered,
+      declined: !!currentCall._declined,
+      video: !!currentCall.video
+    } : null;
 
     stopRingtone();
     if (currentCall && currentCall._timer) {
@@ -398,6 +407,20 @@ window.WebRTCCall = (function () {
 
     if (roomId) {
       window.sb.from('signaling').delete().eq('room_id', roomId).then(() => {}).catch(() => {});
+    }
+
+    // Log call to database
+    if (wasInCall && callMeta && callMeta.friendId) {
+      const myId = getMyUserId();
+      if (myId) {
+        const kind = callMeta.answered ? (callMeta.video ? 'video' : 'voice') : 'missed';
+        const row = {
+          caller_id: callMeta.initiator ? myId : callMeta.friendId,
+          callee_id: callMeta.initiator ? callMeta.friendId : myId,
+          kind
+        };
+        window.sb.from('calls').insert(row).then(() => {}).catch(e => console.warn('[call log]', e));
+      }
     }
 
     hideCallUI();

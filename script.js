@@ -2007,15 +2007,18 @@ async function loadCallsScreen() {
   container.innerHTML = calls.map(c => {
     const otherId = c.caller_id === me.id ? c.callee_id : c.caller_id;
     const other = profilesMap[otherId] || {};
-    const arrow = c.kind === 'missed' ? 'missed' : (c.caller_id === me.id ? 'outgoing' : 'incoming');
-    const sym   = arrow === 'outgoing' ? '&#8599;' : '&#8601;';
+    const isMissed = c.kind === 'missed';
+    const isOutgoing = c.caller_id === me.id;
+    const arrow = isMissed ? 'missed' : (isOutgoing ? 'outgoing' : 'incoming');
+    const sym   = isMissed ? '&#10006;' : (isOutgoing ? '&#8599;' : '&#8601;');
+    const typeLabel = isMissed ? 'Missed' : (c.kind === 'video' ? 'Video' : 'Voice');
     return `
       <div class="notif-item">
         <div class="avatar"><img src="${avatarOf(other)}" alt=""/></div>
         <div class="notif-info">
           <div class="notif-text">
             <strong>${escapeHtml(other.full_name || other.display_name || other.username || 'Unknown')}</strong>
-            <div class="call-meta ${arrow}">${sym} ${arrow}</div>
+            <div class="call-meta ${arrow}">${sym} ${typeLabel} · ${arrow}</div>
           </div>
           <div class="notif-time">${formatTime(c.created_at)}</div>
         </div>
