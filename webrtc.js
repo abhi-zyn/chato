@@ -411,27 +411,19 @@ window.WebRTCCall = (function () {
       window.sb.from('signaling').delete().eq('room_id', roomId).then(() => {}).catch(() => {});
     }
 
-    // Log call to database
-    if (wasInCall && callMeta && callMeta.friendId) {
+    // Log call to database (only initiator logs to avoid duplicates)
+    if (wasInCall && callMeta && callMeta.friendId && callMeta.initiator) {
       const myId = getMyUserId();
       if (myId) {
         const kind = callMeta.answered ? 'voice' : 'missed';
-        const caller = callMeta.initiator ? myId : callMeta.friendId;
-        const callee = callMeta.initiator ? callMeta.friendId : myId;
-        console.log('[call log] saving:', { caller, callee, kind });
         window.sb.from('calls').insert([{
-          caller_id: caller,
-          callee_id: callee,
+          caller_id: myId,
+          callee_id: callMeta.friendId,
           kind
         }]).then(({ error }) => {
           if (error) console.error('[call log] insert failed:', error.message);
-          else console.log('[call log] saved successfully');
-        }).catch(e => console.error('[call log] exception:', e));
-      } else {
-        console.warn('[call log] no myId');
+        }).catch(e => console.error('[call log]', e));
       }
-    } else {
-      console.warn('[call log] skipped:', { wasInCall, hasMeta: !!callMeta, friendId: callMeta && callMeta.friendId });
     }
 
     hideCallUI();
