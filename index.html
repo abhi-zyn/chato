@@ -11,7 +11,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>PopChats</title>
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="login.css?v=4">
 <link rel="stylesheet" href="desktop.css?v=9">
@@ -610,9 +610,9 @@
 <script src="supabase-config.js?v=2"></script>
 <script src="supabase-client.js?v=2"></script>
 <script src="auth.js?v=2"></script>
-<script src="db.js?v=10"></script>
-<script src="webrtc.js?v=6"></script>
-<script src="script.js?v=17"></script>
+<script src="db.js?v=11"></script>
+<script src="webrtc.js?v=7"></script>
+<script src="script.js?v=19"></script>
 <script src="auto-update.js?v=2"></script>
 <script>
 if ('serviceWorker' in navigator) {
@@ -624,26 +624,74 @@ if ('serviceWorker' in navigator) {
 </script>
 
 <!-- Call UI -->
-<div class="call-overlay" id="callUI">
+<div class="call-overlay" id="callUI" data-state="idle">
+  <!-- Backdrop: blurred caller avatar for voice calls, remote video for video calls -->
+  <div class="call-bg" id="callBg" aria-hidden="true"></div>
+  <div class="call-bg-scrim" aria-hidden="true"></div>
   <video id="remoteVideo" autoplay playsinline></video>
   <video id="localVideo" autoplay playsinline muted></video>
-  <div class="call-info">
-    <p class="call-status" id="callStatus">Calling...</p>
+
+  <!-- Tap-to-show-controls layer (only used in active video state) -->
+  <div class="call-tap-zone" id="callTapZone"></div>
+
+  <!-- Top bar: type + status -->
+  <div class="call-topbar" id="callTopbar">
+    <div class="call-type" id="callType">Voice call</div>
+    <div class="call-status" id="callStatus">Calling…</div>
   </div>
+
+  <!-- Hero: avatar + name (hidden in active video state) -->
+  <div class="call-hero" id="callHero">
+    <div class="call-avatar-wrap">
+      <div class="call-avatar-pulse" aria-hidden="true"></div>
+      <img class="call-avatar" id="callAvatar" alt="" src="">
+    </div>
+    <h2 class="call-name" id="callName">—</h2>
+    <p class="call-handle" id="callHandle">@—</p>
+  </div>
+
+  <!-- Active / outgoing controls -->
   <div class="call-controls" id="callControls">
-    <button class="call-btn" id="muteBtn" title="Mute">
-      <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+    <button class="call-btn" id="muteBtn" type="button" data-on="false" aria-label="Mute">
+      <span class="call-btn-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      </span>
+      <span class="call-btn-label">Mute</span>
     </button>
-    <button class="call-btn call-btn-video" id="videoBtn" title="Camera">
-      <svg viewBox="0 0 24 24"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+    <button class="call-btn" id="speakerBtn" type="button" data-on="false">
+      <span class="call-btn-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+      </span>
+      <span class="call-btn-label">Speaker</span>
     </button>
-    <button class="call-btn call-btn-end" id="endCallBtn" title="End call">
-      <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+    <button class="call-btn" id="videoBtn" type="button" data-on="false">
+      <span class="call-btn-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+      </span>
+      <span class="call-btn-label">Camera</span>
+    </button>
+    <button class="call-btn call-btn-end" id="endCallBtn" type="button">
+      <span class="call-btn-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11l-1.27 1.27"/><line x1="23" y1="1" x2="1" y2="23"/></svg>
+      </span>
+      <span class="call-btn-label">End</span>
     </button>
   </div>
-  <div class="incoming-call-btns" id="incomingCallBtns">
-    <button class="call-btn call-btn-decline" id="declineCallBtn">Decline</button>
-    <button class="call-btn call-btn-answer" id="answerCallBtn">Answer</button>
+
+  <!-- Incoming call answer/decline -->
+  <div class="call-incoming-actions" id="incomingCallBtns">
+    <button class="call-incoming-btn call-btn-decline" id="declineCallBtn" type="button">
+      <span class="call-incoming-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11l-1.27 1.27"/></svg>
+      </span>
+      <span class="call-incoming-label">Decline</span>
+    </button>
+    <button class="call-incoming-btn call-btn-answer" id="answerCallBtn" type="button">
+      <span class="call-incoming-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+      </span>
+      <span class="call-incoming-label">Accept</span>
+    </button>
   </div>
 </div>
 

@@ -558,9 +558,36 @@ window.PopChatsDB = (function () {
   // POLLING fallback — checks for new messages every N seconds.
   // Runs alongside realtime so we catch messages even if websocket is dropped
   // (mobile networks, background tabs, etc.)
+  //
+  // lastSeenAt is persisted in localStorage so on page refresh we resume from
+  // where we left off and pick up any messages that arrived while the page was
+  // closed. Without this, refresh would silently drop those messages and the
+  // unread badges would stay at 0 even though new messages exist.
   function startMessagePolling(onNewMessage, intervalMs = 5000) {
-    let lastSeenAt = new Date().toISOString();
+    const LS_KEY = 'popchats.poll.lastSeenAt';
+    let lastSeenAt;
+    try {
+      const stored = localStorage.getItem(LS_KEY);
+      if (stored) {
+        // Cap the lookback window to avoid replaying ancient history if the
+        // user hasn't opened the app in a long time. 7 days is a sane upper bound.
+        const storedMs = new Date(stored).getTime();
+        const maxLookbackMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        lastSeenAt = new Date(Math.max(storedMs, maxLookbackMs)).toISOString();
+      } else {
+        // First run on this device — start from "now" so we don't try to
+        // replay the entire chat history on initial install.
+        lastSeenAt = new Date().toISOString();
+        localStorage.setItem(LS_KEY, lastSeenAt);
+      }
+    } catch (_) {
+      lastSeenAt = new Date().toISOString();
+    }
     let cancelled = false;
+
+    function persistLastSeen() {
+      try { localStorage.setItem(LS_KEY, lastSeenAt); } catch (_) {}
+    }
 
     async function poll() {
       if (cancelled) return;
@@ -584,6 +611,7 @@ window.PopChatsDB = (function () {
         if (r.data && r.data.length) {
           // Update lastSeenAt to the most recent message
           lastSeenAt = r.data[r.data.length - 1].created_at;
+          persistLastSeen();
           // Process each new message
           for (const msg of r.data) {
             if (msg.text_enc && !msg.text) {
@@ -600,9 +628,11 @@ window.PopChatsDB = (function () {
       }
       if (!cancelled) setTimeout(poll, intervalMs);
     }
-    
-    setTimeout(poll, intervalMs);
-    
+
+    // First poll: run immediately on startup so we catch any messages that
+    // arrived while the page was closed. Subsequent polls run on intervalMs.
+    setTimeout(poll, 0);
+
     return {
       cancel: () => { cancelled = true; }
     };

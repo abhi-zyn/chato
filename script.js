@@ -153,6 +153,43 @@ const _unread = {
   }
 };
 
+// Per-chat "last read" timestamp (persisted) — survives refresh so we don't
+// re-count already-read messages when the polling fallback replays history.
+// This is purely client-side (no server schema for read receipts).
+const _readState = {
+  get map() {
+    if (this._m !== undefined) return this._m;
+    try {
+      const raw = localStorage.getItem('popchats.lastRead');
+      this._m = raw ? JSON.parse(raw) : {};
+    } catch (_) { this._m = {}; }
+    return this._m;
+  },
+  save() {
+    try {
+      localStorage.setItem('popchats.lastRead', JSON.stringify(this._m || {}));
+    } catch (_) {}
+  },
+  get(chatId) { return this.map[chatId] || ''; },
+  // Advance read pointer to `at` (ISO string) only if it's newer than current.
+  mark(chatId, at) {
+    if (!chatId || !at) return;
+    this._m = this.map;
+    const cur = this._m[chatId];
+    if (!cur || new Date(at) > new Date(cur)) {
+      this._m[chatId] = at;
+      this.save();
+    }
+  },
+  // True if this message has already been read (created_at <= lastRead).
+  alreadyRead(chatId, createdAt) {
+    if (!createdAt) return false;
+    const last = this.get(chatId);
+    if (!last) return false;
+    return new Date(createdAt) <= new Date(last);
+  }
+};
+
 // ---------- helpers ----------
 const AVATAR_FALLBACK = 'https://api.dicebear.com/7.x/initials/svg?seed=';
 function avatarOf(p) {
@@ -404,7 +441,27 @@ function handleIncomingMessage(msg) {
     const arr = Array.from(_seenMessageIds);
     arr.slice(0, 250).forEach(id => _seenMessageIds.delete(id));
   }
-  
+
+  // My own messages: just advance read pointer; never count as unread.
+  if (me && msg.sender_id === me.id) {
+    _readState.mark(msg.chat_id, msg.created_at);
+    if (_cache.chats) {
+      const chat = _cache.chats.find(c => c.id === msg.chat_id);
+      if (chat) {
+        chat.last_text = msg.text || '';
+        chat.last_at = msg.created_at;
+        _cache.chats = _cache.chats;
+      }
+    }
+    updateChatCardPreview(msg.chat_id, msg.text || '');
+    return;
+  }
+
+  // Cross-refresh dedupe: if this message was already seen/read in a previous
+  // session (per persisted _readState), skip the unread bump. Otherwise, on
+  // page refresh the polling fallback would replay history and over-count.
+  const alreadyRead = _readState.alreadyRead(msg.chat_id, msg.created_at);
+
   // Update last message in cached chat list for instant preview
   if (_cache.chats) {
     const chat = _cache.chats.find(c => c.id === msg.chat_id);
@@ -420,13 +477,12 @@ function handleIncomingMessage(msg) {
 
   // If this chat is currently open, append message directly (no unread bump)
   if (activeChat && activeChat.id === msg.chat_id) {
-    if (me && msg.sender_id === me.id) return; // already shown via send flow
     appendMessage(msg);
+    _readState.mark(msg.chat_id, msg.created_at);
     return;
   }
 
-  // Ignore my own messages for unread bump (already handled by send flow)
-  if (me && msg.sender_id === me.id) return;
+  if (alreadyRead) return;
 
   // Bump unread counter
   _unread.inc(msg.chat_id);
@@ -526,6 +582,9 @@ async function openChat(chatId, otherProfile, isStranger) {
   
   // Clear unread count for this chat
   _unread.clear(chatId);
+  // Advance the per-chat read pointer to "now" so any historical messages
+  // replayed by the polling fallback after a future refresh won't re-bump unread.
+  _readState.mark(chatId, new Date().toISOString());
   updateChatCardUnread(chatId);
   updateGlobalUnreadBadge();
   
@@ -1990,6 +2049,13 @@ function bootUnauthed() {
   if (friendActivitySub) { PopChatsDB.unsubscribe(friendActivitySub); friendActivitySub = null; }
   if (allMessagesSub) { PopChatsDB.unsubscribe(allMessagesSub); allMessagesSub = null; }
   if (messagePoller) { messagePoller.cancel(); messagePoller = null; }
+  // Clear per-user unread/read state so a different account on the same device
+  // doesn't inherit stale badges or read pointers.
+  try {
+    localStorage.removeItem('popchats.unread');
+    localStorage.removeItem('popchats.lastRead');
+    localStorage.removeItem('popchats.poll.lastSeenAt');
+  } catch (_) {}
   stopOnlineHeartbeat();
   stopPresenceWatcher();
   if (window.WebRTCCall && WebRTCCall.stopInboundListener) {
@@ -2287,10 +2353,27 @@ function bootUnauthed() {
     }
   });
 
+  // Helper: snapshot the friend profile from the open friend-sheet for instant
+  // call-UI render (avatar, name, handle), then hand off to WebRTCCall.
+  function _friendFromSheet() {
+    const handle = document.getElementById('friendSheetHandle');
+    const name   = document.getElementById('friendSheetName');
+    const avatar = document.getElementById('friendSheetAvatar');
+    const id = handle && handle.dataset && handle.dataset.userId;
+    if (!id) return null;
+    return {
+      id,
+      username: handle && handle.textContent ? handle.textContent.replace(/^@/, '') : '',
+      full_name: name && name.textContent ? name.textContent : '',
+      display_name: name && name.textContent ? name.textContent : '',
+      avatar_url: avatar && avatar.src ? avatar.src : ''
+    };
+  }
+
   // Call button handlers
   document.getElementById('friendSheetCall')?.addEventListener('click', async () => {
-    const friendId = document.getElementById('friendSheetHandle').dataset.userId;
-    if (!friendId) {
+    const friend = _friendFromSheet();
+    if (!friend) {
       toast('Cannot start call: user ID missing');
       return;
     }
@@ -2299,12 +2382,12 @@ function bootUnauthed() {
       return;
     }
     closeFriendSheet();
-    await WebRTCCall.startCall(friendId, false);
+    await WebRTCCall.startCall(friend, false);
   });
 
   document.getElementById('friendSheetVideo')?.addEventListener('click', async () => {
-    const friendId = document.getElementById('friendSheetHandle').dataset.userId;
-    if (!friendId) {
+    const friend = _friendFromSheet();
+    if (!friend) {
       toast('Cannot start call: user ID missing');
       return;
     }
@@ -2313,7 +2396,7 @@ function bootUnauthed() {
       return;
     }
     closeFriendSheet();
-    await WebRTCCall.startCall(friendId, true);
+    await WebRTCCall.startCall(friend, true);
   });
 
   document.getElementById('answerCallBtn')?.addEventListener('click', () => {
@@ -2330,12 +2413,31 @@ function bootUnauthed() {
 
   document.getElementById('muteBtn')?.addEventListener('click', (e) => {
     const enabled = WebRTCCall.toggleMute();
-    e.currentTarget.style.opacity = enabled ? '1' : '0.5';
+    if (enabled == null) return;
+    // enabled=true means audio is on (NOT muted) -> button shows "rest" (glass).
+    // enabled=false means muted -> highlighted white pill, label switches to "Unmute".
+    e.currentTarget.dataset.on = enabled ? 'false' : 'true';
+    const label = e.currentTarget.querySelector('.call-btn-label');
+    if (label) label.textContent = enabled ? 'Mute' : 'Unmute';
   });
 
-  document.getElementById('videoBtn')?.addEventListener('click', (e) => {
+  document.getElementById('videoBtn')?.addEventListener('click', async (e) => {
     const enabled = WebRTCCall.toggleVideo();
-    e.currentTarget.style.opacity = enabled ? '1' : '0.5';
+    if (enabled == null) {
+      toast("Camera can't be toggled mid-call from voice mode");
+      return;
+    }
+    e.currentTarget.dataset.on = enabled ? 'true' : 'false';
+  });
+
+  document.getElementById('speakerBtn')?.addEventListener('click', async (e) => {
+    const isOn = e.currentTarget.dataset.on === 'true';
+    const next = await WebRTCCall.toggleSpeaker(!isOn);
+    if (next == null) {
+      toast('Speaker switching not supported on this device');
+      return;
+    }
+    e.currentTarget.dataset.on = next ? 'true' : 'false';
   });
 
   // Share profile button
