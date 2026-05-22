@@ -755,8 +755,26 @@ async function renderMessages(chatId) {
 }
 
 function appendMessage(m, animate = true, idx = 0) {
-  if (document.getElementById('msg-' + m.id)) return; // de-dupe realtime echoes
+  if (document.getElementById('msg-' + m.id)) {
+    // Already in DOM — but make sure the cache has it (realtime/server may
+    // deliver a row that we already optimistically rendered without caching).
+    cacheMessageIfMissing(m);
+    return;
+  }
   const isMine = me && m.sender_id === me.id;
+  // Reconcile with optimistic pending row: if realtime delivers our own
+  // message before the send RPC has resolved, find the pending temp row
+  // matching this text and upgrade it instead of appending a duplicate.
+  if (isMine) {
+    const pending = findPendingOptimisticRow(m);
+    if (pending) {
+      pending.id = 'msg-' + m.id;
+      pending.removeAttribute('data-pending');
+      pending.removeAttribute('data-pending-text');
+      cacheMessageIfMissing(m);
+      return;
+    }
+  }
   const r = document.createElement('div');
   r.id = 'msg-' + m.id;
   r.className = 'msg-row ' + (isMine ? 'sent' : 'received');
@@ -767,14 +785,32 @@ function appendMessage(m, animate = true, idx = 0) {
   msgBox.appendChild(r);
   requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
   // Keep cache in sync for realtime messages
-  if (animate && activeChat) {
-    const chatId = activeChat.id;
-    if (!_cache.messages[chatId]) _cache.messages[chatId] = [];
-    if (!_cache.messages[chatId].find(x => x.id === m.id)) {
-      _cache.messages[chatId].push(m);
-      _cache.saveMessages();
-    }
+  if (animate) cacheMessageIfMissing(m);
+}
+
+// Persist a message into the per-chat localStorage cache if not already there.
+// Used to ensure sent + realtime messages survive a page refresh even when
+// `listMessages()` is slow or fails on the next render.
+function cacheMessageIfMissing(m) {
+  if (!m || !m.id || !m.chat_id) return;
+  const chatId = m.chat_id;
+  if (!_cache.messages[chatId]) _cache.messages[chatId] = [];
+  if (!_cache.messages[chatId].find(x => x.id === m.id)) {
+    _cache.messages[chatId].push(m);
+    _cache.saveMessages();
   }
+}
+
+// Find an optimistic pending DOM row that hasn't received its real id yet.
+// Match by exact text — good enough since duplicates within a few seconds are
+// extremely rare and the worst case is a one-off duplicate, not a missing msg.
+function findPendingOptimisticRow(m) {
+  if (!msgBox || !m || !m.text) return null;
+  const rows = msgBox.querySelectorAll('.msg-row.sent[data-pending="true"]');
+  for (const row of rows) {
+    if (row.getAttribute('data-pending-text') === m.text) return row;
+  }
+  return null;
 }
 
 async function sendMsg() {
@@ -789,9 +825,14 @@ async function sendMsg() {
 
   // Optimistic local echo with pop animation
   const tempId = 'temp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+  const sendingChatId = activeChat.id;
   const r = document.createElement('div');
   r.id = 'msg-' + tempId;
   r.className = 'msg-row sent just-sent';
+  // Tag as pending so a racing realtime echo can reconcile instead of
+  // appending a duplicate row.
+  r.setAttribute('data-pending', 'true');
+  r.setAttribute('data-pending-text', txt);
   r.innerHTML =
     `<div class="msg-bubble">${escapeHtml(txt)}</div>` +
     `<div class="msg-time">${formatTime(new Date().toISOString())}</div>`;
@@ -801,19 +842,38 @@ async function sendMsg() {
   setTimeout(() => r.classList.add('settled'), 500);
 
   try {
-    const saved = await PopChatsDB.sendMessage(activeChat.id, txt);
-    // Replace temp row id with the real DB id so realtime echo dedupes
-    if (saved && saved.id) r.id = 'msg-' + saved.id;
+    const saved = await PopChatsDB.sendMessage(sendingChatId, txt);
+    if (saved && saved.id) {
+      // Ensure chat_id is present for caching (RPC returns it; insert fallback too)
+      if (!saved.chat_id) saved.chat_id = sendingChatId;
+      // Race-safe id reconciliation:
+      // If realtime already appended a row with the real id while we were
+      // awaiting, drop our optimistic row to avoid duplicate DOM ids.
+      const existingReal = document.getElementById('msg-' + saved.id);
+      if (existingReal && existingReal !== r) {
+        r.remove();
+      } else {
+        r.id = 'msg-' + saved.id;
+        r.removeAttribute('data-pending');
+        r.removeAttribute('data-pending-text');
+      }
+      // Persist to the per-chat cache so a refresh — or a slow/failing
+      // background listMessages — never makes the just-sent message
+      // disappear from the UI.
+      cacheMessageIfMissing(saved);
+      // Also mark our read pointer so polling fallback doesn't re-bump.
+      try { _readState && _readState.mark(sendingChatId, saved.created_at); } catch (_) {}
+    }
     // Update chat list preview with my own message text
     if (_cache.chats) {
-      const chat = _cache.chats.find(c => c.id === activeChat.id);
+      const chat = _cache.chats.find(c => c.id === sendingChatId);
       if (chat) {
         chat.last_text = txt;
-        chat.last_at = new Date().toISOString();
+        chat.last_at = (saved && saved.created_at) || new Date().toISOString();
         _cache.chats = _cache.chats;
       }
     }
-    updateChatCardPreview(activeChat.id, txt);
+    updateChatCardPreview(sendingChatId, txt);
   } catch (e) {
     console.error(e);
     r.remove();
