@@ -1,5 +1,5 @@
-// PopChats Service Worker — enables PWA install + offline shell
-const CACHE_NAME = 'popchats-v2';
+// PopChats Service Worker — PWA shell cache + Web Push receiver.
+const CACHE_NAME = 'popchats-v3';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -11,52 +11,97 @@ const SHELL_ASSETS = [
   '/auth.js',
   '/supabase-config.js',
   '/supabase-client.js',
-  '/icon.svg'
+  '/icon.svg',
+  '/manifest.json'
 ];
 
-// Install: cache app shell
+// Install: cache app shell (one-time download, served from cache thereafter).
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL_ASSETS))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS))
   );
   self.skipWaiting();
 });
 
-// Activate: clean old caches
+// Activate: drop old caches.
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
 });
 
-// Fetch: ONLY cache same-origin GET requests for shell assets.
-// Let everything else (API calls, external scripts) pass through untouched.
+// Fetch: serve same-origin GETs from cache-first, with a stale-while-revalidate
+// fallback. Never intercept Supabase REST / Auth requests.
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
-
-  // Only handle same-origin navigation/asset requests
   if (url.origin !== self.location.origin) return;
   if (e.request.method !== 'GET') return;
-
-  // Don't intercept supabase or auth-related requests
   if (url.pathname.startsWith('/rest/') || url.pathname.startsWith('/auth/')) return;
 
   e.respondWith(
-    fetch(e.request)
-      .then(response => {
-        // Cache successful responses
-        if (response && response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
-        }
-        return response;
-      })
-      .catch(() => {
-        // Offline: serve from cache
-        return caches.match(e.request);
-      })
+    caches.match(e.request).then((cached) => {
+      const networkFetch = fetch(e.request)
+        .then((response) => {
+          if (response && response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+          }
+          return response;
+        })
+        .catch(() => cached);
+      // Cache-first: return cached immediately if present, refresh in background.
+      return cached || networkFetch;
+    })
   );
+});
+
+// ---------- Web Push ----------
+// Tiny payload: { c: chatId, s: senderName, b: bodyPreview }
+self.addEventListener('push', (e) => {
+  let data = {};
+  try { data = e.data ? e.data.json() : {}; } catch (_) { data = {}; }
+
+  const senderName = data.s || 'PopChats';
+  const body = data.b || 'sent you a message';
+  const chatId = data.c || '';
+
+  e.waitUntil(
+    self.registration.showNotification(senderName, {
+      body,
+      icon: '/icon.svg',
+      badge: '/icon.svg',
+      tag: chatId ? 'popchats-chat-' + chatId : 'popchats-msg',
+      renotify: false,
+      // Click target — we use the URL hash so the page can route to the chat
+      // without a server roundtrip.
+      data: { chatId, url: chatId ? `/?chat=${encodeURIComponent(chatId)}` : '/' },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const targetUrl = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil((async () => {
+    const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    // If we already have a tab open, focus it and tell it to open the chat.
+    for (const c of allClients) {
+      if ('focus' in c) {
+        try {
+          c.postMessage({
+            type: 'popchats-open-chat',
+            chatId: e.notification.data && e.notification.data.chatId,
+          });
+        } catch (_) {}
+        return c.focus();
+      }
+    }
+    // Otherwise open a new tab.
+    if (self.clients.openWindow) {
+      return self.clients.openWindow(targetUrl);
+    }
+  })());
 });

@@ -607,18 +607,19 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=2"></script>
+<script src="supabase-config.js?v=3"></script>
 <script src="supabase-client.js?v=2"></script>
 <script src="auth.js?v=2"></script>
-<script src="db.js?v=12"></script>
+<script src="db.js?v=13"></script>
 <script src="webrtc.js?v=7"></script>
-<script src="script.js?v=22"></script>
+<script src="script.js?v=23"></script>
 <script src="auto-update.js?v=2"></script>
 <script>
+// PopChats — register the service worker for offline shell + Web Push.
 if ('serviceWorker' in navigator) {
-  // Unregister broken SW — do NOT re-register until it's fixed
-  navigator.serviceWorker.getRegistrations().then(regs => {
-    regs.forEach(r => r.unregister());
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((e) =>
+      console.warn('[sw] register failed:', e && e.message));
   });
 }
 </script>

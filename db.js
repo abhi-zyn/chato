@@ -681,6 +681,38 @@ window.PopChatsDB = (function () {
     return ch;
   }
 
+  // ---------- Push subscriptions (Web Push / VAPID) ----------
+  async function savePushSubscription(sub) {
+    const id = await uid(); if (!id) throw new Error('Not signed in');
+    if (!sub || !sub.endpoint || !sub.keys) throw new Error('bad subscription');
+    const row = {
+      user_id: id,
+      endpoint: sub.endpoint,
+      p256dh: sub.keys.p256dh,
+      auth: sub.keys.auth,
+      user_agent: navigator.userAgent,
+      last_used_at: new Date().toISOString(),
+    };
+    // Upsert by endpoint (unique). Using on_conflict so re-saving the same
+    // endpoint just refreshes last_used_at instead of erroring.
+    const { data, error } = await client()
+      .from('push_subscriptions')
+      .upsert(row, { onConflict: 'endpoint' })
+      .select().maybeSingle();
+    if (error) { console.error('[savePushSubscription]', error); return null; }
+    return data;
+  }
+
+  async function deletePushSubscription(endpoint) {
+    if (!endpoint) return;
+    const { error } = await client()
+      .from('push_subscriptions')
+      .delete()
+      .eq('endpoint', endpoint);
+    if (error) console.error('[deletePushSubscription]', error);
+  }
+
+
   // ---------- notifications / calls (history) ----------
   async function listNotifications() {
     const id = await uid(); if (!id) return [];
@@ -712,6 +744,7 @@ window.PopChatsDB = (function () {
     listMessages, sendMessage, subscribeToChat, subscribeToAllMyMessages, startMessagePolling, unsubscribe,
     decryptMessage, lastMessagePreview,
     markChatRead, getChatReadStates, subscribeToChatReads,
+    savePushSubscription, deletePushSubscription,
     listNotifications, listCalls
   };
 })();

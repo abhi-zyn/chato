@@ -610,7 +610,11 @@ function notifSupported() {
 // resolve immediately if already granted/denied.
 async function ensureNotificationPermission() {
   if (!notifSupported()) return 'unsupported';
-  if (Notification.permission === 'granted') return 'granted';
+  if (Notification.permission === 'granted') {
+    // Already granted — make sure the device is registered for background push.
+    ensurePushSubscription().catch(() => {});
+    return 'granted';
+  }
   if (Notification.permission === 'denied') return 'denied';
   // Don't pop the prompt more than once per session — browsers throttle
   // anyway, but this avoids surprising the user mid-session.
@@ -620,9 +624,71 @@ async function ensureNotificationPermission() {
   } catch (_) {}
   try {
     const res = await Notification.requestPermission();
+    if (res === 'granted') ensurePushSubscription().catch(() => {});
     return res;
   } catch (_) { return Notification.permission; }
 }
+
+// ---------- Web Push (background notifications) ----------
+// VAPID public key in URL-safe base64 → raw Uint8Array (required by
+// pushManager.subscribe).
+function urlBase64ToUint8Array(base64String) {
+  if (!base64String) return new Uint8Array();
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const b64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(b64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+// Lazily create / refresh the browser's push subscription and store it in
+// the database. No-op when:
+//   - VAPID public key not configured (server side not set up yet)
+//   - Service Worker / PushManager not supported (e.g. iOS Safari without PWA)
+//   - User hasn't granted notification permission
+async function ensurePushSubscription() {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (!window.VAPID_PUBLIC_KEY) return;
+    if (!notifSupported() || Notification.permission !== 'granted') return;
+    if (!me || !me.id) return;
+
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(window.VAPID_PUBLIC_KEY),
+      });
+    }
+    if (sub) {
+      await PopChatsDB.savePushSubscription(sub.toJSON());
+      // Background push works → loosen the foreground polling fallback so we
+      // use less mobile data while idle.
+      _bgPushActive = true;
+    }
+  } catch (e) {
+    console.warn('[push] subscribe failed:', e && e.message);
+  }
+}
+
+// Listen for "open this chat" messages from the SW (e.g. notification clicks
+// while the tab is already open).
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    const d = e.data || {};
+    if (d.type === 'popchats-open-chat' && d.chatId) {
+      if (!activeChat || activeChat.id !== d.chatId) {
+        // We don't have the other-profile in hand — let openChat fetch members.
+        openChat(d.chatId, null).catch(() => {});
+      }
+    }
+  });
+}
+
+let _bgPushActive = false;
 
 // Look up display info for a sender via the cached chat list. Falls back to
 // a network lookup if needed, but only for the title / avatar — the body is
@@ -2338,9 +2404,16 @@ async function bootAuthed(user) {
       if (me && me.id) {
         // Try realtime first
         allMessagesSub = PopChatsDB.subscribeToAllMyMessages(handleIncomingMessage);
-        // Always run polling as a fallback (every 5s) — handles cases where
-        // realtime websocket is dropped, throttled, or blocked (mobile browsers)
-        messagePoller = PopChatsDB.startMessagePolling(handleIncomingMessage, 5000);
+        // Polling fallback — handles cases where the realtime websocket is
+        // dropped, throttled, or blocked (mobile browsers). Interval is
+        // raised to 30s once Web Push is registered for the device, since
+        // background pushes will catch anything realtime misses.
+        const pollMs = _bgPushActive ? 30000 : 5000;
+        messagePoller = PopChatsDB.startMessagePolling(handleIncomingMessage, pollMs);
+        // Try registering Web Push opportunistically; if it succeeds and the
+        // poller is still running on the slow path, that's fine — re-checking
+        // on next bootAuthed will pick it up.
+        ensurePushSubscription().catch(() => {});
       }
       if (me && !me.onboarded) openOnboardingModal(user);
       // PWA install prompt: first login + every 5 days
