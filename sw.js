@@ -75,6 +75,9 @@ self.addEventListener('push', (e) => {
       badge: '/icon.svg',
       tag: chatId ? 'popchats-chat-' + chatId : 'popchats-msg',
       renotify: false,
+      // Keep the notification visible until the user interacts with it.
+      // Without this, most desktop browsers auto-dismiss after a few seconds.
+      requireInteraction: true,
       // Click target — we use the URL hash so the page can route to the chat
       // without a server roundtrip.
       data: { chatId, url: chatId ? `/?chat=${encodeURIComponent(chatId)}` : '/' },

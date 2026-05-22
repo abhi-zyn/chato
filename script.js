@@ -723,6 +723,8 @@ function showMessageNotification(msg) {
       tag: 'popchats-chat-' + msg.chat_id,
       renotify: false,
       silent: false,
+      // Keep the notification visible until the user clicks / dismisses it.
+      requireInteraction: true,
       // Lets us recover the chat id when the user clicks the notification
       data: { chatId: msg.chat_id, senderId: msg.sender_id }
     });
@@ -736,8 +738,6 @@ function showMessageNotification(msg) {
         openChat(msg.chat_id, sender || null);
       }
     };
-    // Auto-close after a short while so a stack of chats doesn't persist.
-    setTimeout(() => { try { n.close(); } catch (_) {} }, 8000);
   } catch (e) {
     console.warn('[notification]', e && e.message);
   }
