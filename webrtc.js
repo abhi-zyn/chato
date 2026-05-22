@@ -426,8 +426,11 @@ window.WebRTCCall = (function () {
           kind
         }]).then(({ error }) => {
           if (error) console.error('[call log] insert failed:', error.message);
+          else console.log('[call log] saved:', kind);
         }).catch(e => console.error('[call log]', e));
       }
+    } else if (wasInCall) {
+      console.log('[call log] not logging:', { initiator: callMeta && callMeta.initiator, logged: _callLogged });
     }
 
     hideCallUI();
