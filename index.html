@@ -606,25 +606,6 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=4"></script>
-<script src="supabase-client.js?v=2"></script>
-<script src="auth.js?v=2"></script>
-<script src="db.js?v=14"></script>
-<script src="webrtc.js?v=7"></script>
-<script src="script.js?v=26"></script>
-<script src="auto-update.js?v=2"></script>
-<script>
-// PopChats — register the service worker for offline shell + Web Push.
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
-      .then((reg) => { reg.update(); })
-      .catch((e) => console.warn('[sw] register failed:', e && e.message));
-  });
-}
-</script>
-
 <!-- Call UI -->
 <div class="call-overlay" id="callUI" data-state="idle">
   <!-- Backdrop: blurred caller avatar for voice calls, remote video for video calls -->
@@ -696,6 +677,25 @@ if ('serviceWorker' in navigator) {
     </button>
   </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=4"></script>
+<script src="supabase-client.js?v=2"></script>
+<script src="auth.js?v=2"></script>
+<script src="db.js?v=14"></script>
+<script src="webrtc.js?v=7"></script>
+<script src="script.js?v=26"></script>
+<script src="auto-update.js?v=2"></script>
+<script>
+// PopChats — register the service worker for offline shell + Web Push.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+      .then((reg) => { reg.update(); })
+      .catch((e) => console.warn('[sw] register failed:', e && e.message));
+  });
+}
+</script>
 
 </body>
 </html>
