@@ -525,6 +525,11 @@ function handleIncomingMessage(msg) {
   if (activeChat && activeChat.id === msg.chat_id) {
     appendMessage(msg);
     _readState.mark(msg.chat_id, msg.created_at);
+    // Still notify if the tab is hidden / unfocused — user might be on
+    // another tab and want to know.
+    if (document.visibilityState !== 'visible' || !document.hasFocus()) {
+      showMessageNotification(msg);
+    }
     return;
   }
 
@@ -548,6 +553,8 @@ function handleIncomingMessage(msg) {
 
   // Subtle ping sound (optional, only if permitted)
   playMessagePing();
+  // Browser notification for the message (if permission granted)
+  showMessageNotification(msg);
 }
 
 // Update just the preview text on a chat card (no full re-render)
@@ -584,6 +591,90 @@ function playMessagePing() {
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.3);
   } catch (_) {}
+}
+
+// ---------- Browser notifications (in-app, while tab is open) ----------
+// True background-when-tab-closed push needs a service worker + VAPID keys
+// + a server function to dispatch pushes. This handles only the open-tab
+// case: notify when the document is hidden, or when a message arrives for
+// a chat the user is not currently viewing.
+const NOTIF_PERM_KEY = 'popchats.notif.asked';
+
+function notifSupported() {
+  return typeof window !== 'undefined' &&
+         'Notification' in window &&
+         typeof Notification.requestPermission === 'function';
+}
+
+// Request permission once per device. Safe to call repeatedly — Browsers
+// resolve immediately if already granted/denied.
+async function ensureNotificationPermission() {
+  if (!notifSupported()) return 'unsupported';
+  if (Notification.permission === 'granted') return 'granted';
+  if (Notification.permission === 'denied') return 'denied';
+  // Don't pop the prompt more than once per session — browsers throttle
+  // anyway, but this avoids surprising the user mid-session.
+  try {
+    if (sessionStorage.getItem(NOTIF_PERM_KEY) === '1') return Notification.permission;
+    sessionStorage.setItem(NOTIF_PERM_KEY, '1');
+  } catch (_) {}
+  try {
+    const res = await Notification.requestPermission();
+    return res;
+  } catch (_) { return Notification.permission; }
+}
+
+// Look up display info for a sender via the cached chat list. Falls back to
+// a network lookup if needed, but only for the title / avatar — the body is
+// already in `msg.text`.
+function findSenderForMessage(msg) {
+  if (!msg) return null;
+  if (_cache.chats) {
+    const chat = _cache.chats.find(c => c.id === msg.chat_id);
+    if (chat && chat.other && chat.other.id === msg.sender_id) return chat.other;
+  }
+  return null;
+}
+
+function showMessageNotification(msg) {
+  if (!notifSupported() || Notification.permission !== 'granted') return;
+  if (!msg || !msg.text) return;
+  // Skip when the user is actively viewing this chat in a focused tab.
+  const isViewingThisChat = activeChat && activeChat.id === msg.chat_id;
+  if (isViewingThisChat && document.visibilityState === 'visible' && document.hasFocus()) {
+    return;
+  }
+  const sender = findSenderForMessage(msg);
+  const title = sender
+    ? (sender.full_name || sender.display_name || ('@' + (sender.username || 'someone')))
+    : 'New message';
+  const icon = (sender && sender.avatar_url) || 'icon.svg';
+  try {
+    const n = new Notification(title, {
+      body: msg.text,
+      icon,
+      badge: 'icon.svg',
+      tag: 'popchats-chat-' + msg.chat_id,
+      renotify: false,
+      silent: false,
+      // Lets us recover the chat id when the user clicks the notification
+      data: { chatId: msg.chat_id, senderId: msg.sender_id }
+    });
+    n.onclick = () => {
+      try { window.focus(); } catch (_) {}
+      try { n.close(); } catch (_) {}
+      // If the chat was already opened in this tab, just bring it to focus;
+      // otherwise navigate.
+      if (!activeChat || activeChat.id !== msg.chat_id) {
+        const sender = findSenderForMessage({ chat_id: msg.chat_id, sender_id: msg.sender_id });
+        openChat(msg.chat_id, sender || null);
+      }
+    };
+    // Auto-close after a short while so a stack of chats doesn't persist.
+    setTimeout(() => { try { n.close(); } catch (_) {} }, 8000);
+  } catch (e) {
+    console.warn('[notification]', e && e.message);
+  }
 }
 
 // Event delegation for chat card clicks (more robust than per-card handlers)
@@ -680,6 +771,11 @@ async function openChat(chatId, otherProfile, isStranger) {
 
   // Keep the "last seen X ago" string fresh while the chat is open
   startConvHeaderTick();
+
+  // Lazy-ask for notification permission on the first chat open. Browsers
+  // require a user gesture for the prompt; openChat is one. Safe no-op if
+  // already granted/denied or unsupported.
+  ensureNotificationPermission().catch(() => {});
 
   // Determine friendship state to gate input and show banner
   await refreshConvFriendGate();
