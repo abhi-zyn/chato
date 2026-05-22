@@ -12,6 +12,7 @@ const SHELL_ASSETS = [
   '/supabase-config.js',
   '/supabase-client.js',
   '/icon.svg',
+  '/icon-192.png',
   '/manifest.json'
 ];
 
