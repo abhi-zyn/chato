@@ -2447,6 +2447,8 @@ async function bootAuthed(user) {
       if (window.WebRTCCall && WebRTCCall.startInboundListener) {
         WebRTCCall.startInboundListener();
       }
+      // Request notification permission early so it shows in App Info for installed PWA
+      ensureNotificationPermission().catch(() => {});
       refreshRequestsBadge().catch(() => {});
       if (friendActivitySub) { PopChatsDB.unsubscribe(friendActivitySub); friendActivitySub = null; }
       if (me && me.id) {
