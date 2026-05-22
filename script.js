@@ -856,7 +856,11 @@ function appendMessage(m, animate = true, idx = 0) {
       pending.id = 'msg-' + m.id;
       pending.removeAttribute('data-pending');
       pending.removeAttribute('data-pending-text');
+      // Server confirmed → upgrade tick to delivered (re-evaluated against
+      // the recipient's read pointer below).
+      setTickState(pending, 'delivered');
       cacheMessageIfMissing(m);
+      applyReadReceipts();
       return;
     }
   }
@@ -864,43 +868,83 @@ function appendMessage(m, animate = true, idx = 0) {
   r.id = 'msg-' + m.id;
   r.className = 'msg-row ' + (isMine ? 'sent' : 'received');
   if (animate) r.style.animationDelay = (idx * 0.05) + 's';
+  // Initial tick state for sent messages = delivered (server confirmed it
+  // exists since we got the row). applyReadReceipts() may upgrade it to read.
+  const tickHTML = isMine ? tickSvg('delivered') : '';
   r.innerHTML =
     `<div class="msg-bubble">${escapeHtml(m.text)}</div>` +
-    `<div class="msg-time">${formatTime(m.created_at)}</div>`;
+    `<div class="msg-time">` +
+      `<span class="msg-time-text">${formatTime(m.created_at)}</span>` +
+      tickHTML +
+    `</div>`;
+  if (isMine) r.setAttribute('data-tick', 'delivered');
   msgBox.appendChild(r);
   requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
   // Keep cache in sync for realtime messages
   if (animate) cacheMessageIfMissing(m);
-  renderSeenIndicator();
+  applyReadReceipts();
 }
 
-// Render the "Seen" indicator under the user's last sent message in the
-// current chat. Removes the indicator if no read receipt is available or if
-// the recipient hasn't read up to my latest sent message yet.
-function renderSeenIndicator() {
-  if (!msgBox || !activeChat || !me) return;
-  // Remove any existing indicator first
-  const old = msgBox.querySelector('.msg-seen');
-  if (old) old.remove();
-  if (!otherLastReadAt) return;
-  // Find the last "sent" message (from me) in DOM order
-  const sentRows = msgBox.querySelectorAll('.msg-row.sent');
-  if (!sentRows.length) return;
-  const lastSent = sentRows[sentRows.length - 1];
-  // Determine the timestamp of that message from cache
-  const cachedList = (_cache.messages && _cache.messages[activeChat.id]) || [];
-  // Match by DOM id → message id (rows use id="msg-<id>")
-  const domId = lastSent.id || '';
-  const msgId = domId.startsWith('msg-') ? domId.slice(4) : '';
-  const lastMsg = cachedList.find(x => x.id === msgId);
-  if (!lastMsg || !lastMsg.created_at) return;
-  if (new Date(otherLastReadAt) >= new Date(lastMsg.created_at)) {
-    const tag = document.createElement('div');
-    tag.className = 'msg-seen';
-    tag.textContent = 'Seen';
-    lastSent.appendChild(tag);
+// ---------- Tick marks (read receipts on each sent message) ----------
+// State machine per sent message:
+//   sent       → ✓  (single, gray)  — optimistic, RPC in flight
+//   delivered  → ✓✓ (double, gray)  — server confirmed
+//   read       → ✓✓ (double, blue)  — recipient's last_read_at >= created_at
+function tickSvg(state) {
+  if (state === 'sent') {
+    return '<svg class="tick tick-sent" viewBox="0 0 16 11" aria-hidden="true">' +
+             '<path d="M1 6 L5.5 10 L15 1" />' +
+           '</svg>';
   }
+  // delivered + read share the double-tick svg; class controls color
+  const cls = state === 'read' ? 'tick tick-read' : 'tick tick-delivered';
+  return `<svg class="${cls}" viewBox="0 0 18 11" aria-hidden="true">` +
+           '<path d="M1 6 L4.5 9.5 L11 2" />' +
+           '<path d="M6 6 L9.5 9.5 L17 2" />' +
+         '</svg>';
 }
+
+function setTickState(rowEl, state) {
+  if (!rowEl) return;
+  if (rowEl.getAttribute('data-tick') === state) return;
+  rowEl.setAttribute('data-tick', state);
+  const time = rowEl.querySelector('.msg-time');
+  if (!time) return;
+  // Strip any previous tick svg, keep the time text
+  const existing = time.querySelector('.tick');
+  if (existing) existing.remove();
+  time.insertAdjacentHTML('beforeend', tickSvg(state));
+}
+
+// Walk all of my sent messages in the active chat and set each tick to
+// 'read' if otherLastReadAt covers it, otherwise 'delivered'. (Pending /
+// optimistic rows keep 'sent' until sendMsg upgrades them.)
+function applyReadReceipts() {
+  if (!msgBox || !activeChat || !me) return;
+  const cachedList = (_cache.messages && _cache.messages[activeChat.id]) || [];
+  const byId = {};
+  cachedList.forEach(x => { byId[x.id] = x; });
+  const readBoundary = otherLastReadAt ? new Date(otherLastReadAt).getTime() : 0;
+  msgBox.querySelectorAll('.msg-row.sent').forEach(row => {
+    // Skip optimistic pending rows — they keep their 'sent' tick until the
+    // send RPC resolves and upgrades them.
+    if (row.getAttribute('data-pending') === 'true') return;
+    const domId = row.id || '';
+    const msgId = domId.startsWith('msg-') ? domId.slice(4) : '';
+    const m = byId[msgId];
+    if (!m || !m.created_at) {
+      // Unknown timing — leave at delivered if it's already been confirmed
+      if (row.getAttribute('data-tick') !== 'read') setTickState(row, 'delivered');
+      return;
+    }
+    const created = new Date(m.created_at).getTime();
+    setTickState(row, readBoundary && created <= readBoundary ? 'read' : 'delivered');
+  });
+}
+
+// Backwards-compat alias used by older render paths.
+function renderSeenIndicator() { applyReadReceipts(); }
+
 
 // Persist a message into the per-chat localStorage cache if not already there.
 // Used to ensure sent + realtime messages survive a page refresh even when
@@ -947,15 +991,19 @@ async function sendMsg() {
   // appending a duplicate row.
   r.setAttribute('data-pending', 'true');
   r.setAttribute('data-pending-text', txt);
+  r.setAttribute('data-tick', 'sent');
   r.innerHTML =
     `<div class="msg-bubble">${escapeHtml(txt)}</div>` +
-    `<div class="msg-time">${formatTime(new Date().toISOString())}</div>`;
+    `<div class="msg-time">` +
+      `<span class="msg-time-text">${formatTime(new Date().toISOString())}</span>` +
+      tickSvg('sent') +
+    `</div>`;
   msgBox.appendChild(r);
   requestAnimationFrame(() => { msgBox.scrollTop = msgBox.scrollHeight; });
   // The previous "Seen" tag belonged to an older message — refresh now so it
   // disappears the moment the new message appears (it'll come back once the
   // recipient reads up to this new message).
-  renderSeenIndicator();
+  applyReadReceipts();
   // Settle the pop highlight after the animation
   setTimeout(() => r.classList.add('settled'), 500);
 
@@ -974,14 +1022,16 @@ async function sendMsg() {
         r.id = 'msg-' + saved.id;
         r.removeAttribute('data-pending');
         r.removeAttribute('data-pending-text');
+        // Server confirmed → upgrade single tick to delivered double-tick.
+        setTickState(r, 'delivered');
       }
       // Persist to the per-chat cache so a refresh — or a slow/failing
       // background listMessages — never makes the just-sent message
       // disappear from the UI.
       cacheMessageIfMissing(saved);
-      // Refresh the Seen indicator now that the optimistic row has a real id
-      // and is in the cache (so it can be matched by id).
-      renderSeenIndicator();
+      // Refresh tick states now that the new message is in the cache (so
+      // applyReadReceipts can match its timestamp against otherLastReadAt).
+      applyReadReceipts();
       // Also mark our read pointer so polling fallback doesn't re-bump.
       try { _readState && _readState.mark(sendingChatId, saved.created_at); } catch (_) {}
     }
