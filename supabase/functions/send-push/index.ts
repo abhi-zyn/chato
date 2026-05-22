@@ -88,9 +88,9 @@ Deno.serve(async (req) => {
   const subs: any[] = await subRes.json();
   if (!subs.length) return new Response('no subscribers', { status: 200 });
 
-  // 4. Look up sender display name (single small query).
+  // 4. Look up sender display name + avatar (single small query).
   const profRes = await sb(
-    `/rest/v1/profiles?id=eq.${row.sender_id}&select=full_name,display_name,username`
+    `/rest/v1/profiles?id=eq.${row.sender_id}&select=full_name,display_name,username,avatar_url`
   );
   const profArr = profRes.ok ? await profRes.json() : [];
   const sender = profArr[0] ?? {};
@@ -99,11 +99,12 @@ Deno.serve(async (req) => {
   // 5. Build the smallest reasonable payload. Skip the body when the column
   //    is empty (encrypted-at-rest case) — the client SW will show
   //    "<senderName> sent a message" in that case.
-  const payloadObj = {
+  const payloadObj: Record<string, string> = {
     c: row.chat_id,
     s: senderName,
     b: shortPreview(row.text || ''),  // empty string for encrypted rows
   };
+  if (sender.avatar_url) payloadObj.i = sender.avatar_url;
   const data = JSON.stringify(payloadObj);
 
   // 6. Send Web Push to each subscription. Drop subscriptions returning

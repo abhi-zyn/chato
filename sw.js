@@ -67,12 +67,13 @@ self.addEventListener('push', (e) => {
   const senderName = data.s || 'PopChats';
   const body = data.b || 'sent you a message';
   const chatId = data.c || '';
+  const icon = data.i || '/icon-192.png';
 
   e.waitUntil(
     self.registration.showNotification(senderName, {
       body,
-      icon: '/icon.svg',
-      badge: '/icon.svg',
+      icon,
+      badge: '/icon-192.png',
       tag: chatId ? 'popchats-chat-' + chatId : 'popchats-msg',
       renotify: false,
       // Keep the notification visible until the user interacts with it.
