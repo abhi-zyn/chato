@@ -57,6 +57,13 @@
     z-index: 50;
     font-family: 'Geist', sans-serif;
     gap: 14px;
+    /* The sidebar's bounding box (~364px wide) overlaps the chat list area
+       to its right. Make the wrapper itself click-transparent so the empty
+       gap between rail and panel — and the panel area when collapsed —
+       doesn't absorb clicks intended for chat cards / header buttons.
+       Interactive children (.sb-rail and the .sb-panel when open) opt back
+       in below. */
+    pointer-events: none;
   }
   .sb-ambient { display: none; }
 
@@ -66,6 +73,9 @@
   .sb-rail {
     position: relative;
     width: 60px;
+    /* Re-enable hit-testing — parent .desktop-sidebar opts out so the empty
+       area around the rail doesn't absorb clicks intended for the chat list. */
+    pointer-events: auto;
     background: rgba(15, 12, 14, 0.6);
     backdrop-filter: blur(28px) saturate(170%);
     -webkit-backdrop-filter: blur(28px) saturate(170%);
