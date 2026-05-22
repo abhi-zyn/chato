@@ -268,6 +268,7 @@ window.WebRTCCall = (function () {
   // Start a call — friendOrId may be a friend object (preferred, for instant UI) or just an id
   async function startCall(friendOrId, video = false) {
     console.log('[startCall] called, friendOrId:', friendOrId, 'video:', video);
+    _callLogged = false;
     try {
       const friend = (friendOrId && typeof friendOrId === 'object') ? friendOrId : null;
       const friendId = friend ? friend.id : friendOrId;
@@ -373,6 +374,8 @@ window.WebRTCCall = (function () {
     endCall();
   }
 
+  let _callLogged = false;
+
   async function endCall() {
     console.log('[endCall] called, currentCall:', !!currentCall);
     const wasInCall = !!currentCall;
@@ -381,9 +384,10 @@ window.WebRTCCall = (function () {
       initiator: currentCall.initiator,
       friendId: currentCall.friendId,
       answered: !!currentCall._answered,
-      declined: !!currentCall._declined,
       video: !!currentCall.video
     } : null;
+    const shouldLog = wasInCall && callMeta && callMeta.friendId && callMeta.initiator && !_callLogged;
+    if (shouldLog) _callLogged = true;
 
     stopRingtone();
     if (currentCall && currentCall._timer) {
@@ -411,8 +415,8 @@ window.WebRTCCall = (function () {
       window.sb.from('signaling').delete().eq('room_id', roomId).then(() => {}).catch(() => {});
     }
 
-    // Log call to database (only initiator logs to avoid duplicates)
-    if (wasInCall && callMeta && callMeta.friendId && callMeta.initiator) {
+    // Log call to database (only initiator logs, only once)
+    if (shouldLog) {
       const myId = getMyUserId();
       if (myId) {
         const kind = callMeta.answered ? 'voice' : 'missed';
