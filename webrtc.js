@@ -267,6 +267,7 @@ window.WebRTCCall = (function () {
 
   // Start a call — friendOrId may be a friend object (preferred, for instant UI) or just an id
   async function startCall(friendOrId, video = false) {
+    console.log('[startCall] called, friendOrId:', friendOrId, 'video:', video);
     try {
       const friend = (friendOrId && typeof friendOrId === 'object') ? friendOrId : null;
       const friendId = friend ? friend.id : friendOrId;
@@ -373,6 +374,7 @@ window.WebRTCCall = (function () {
   }
 
   async function endCall() {
+    console.log('[endCall] called, currentCall:', !!currentCall);
     const wasInCall = !!currentCall;
     const roomId = currentCall && currentCall.roomId;
     const callMeta = currentCall ? {
