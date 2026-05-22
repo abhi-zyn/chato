@@ -618,8 +618,9 @@
 // PopChats — register the service worker for offline shell + Web Push.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((e) =>
-      console.warn('[sw] register failed:', e && e.message));
+    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+      .then((reg) => { reg.update(); })
+      .catch((e) => console.warn('[sw] register failed:', e && e.message));
   });
 }
 </script>

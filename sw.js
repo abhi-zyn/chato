@@ -1,5 +1,5 @@
 // PopChats Service Worker — PWA shell cache + Web Push receiver.
-const CACHE_NAME = 'popchats-v4';
+const CACHE_NAME = 'popchats-v5';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -63,27 +63,28 @@ self.addEventListener('fetch', (e) => {
 // Tiny payload: { c: chatId, s: senderName, b: bodyPreview, i: avatarUrl }
 self.addEventListener('push', (e) => {
   let data = {};
-  try { data = e.data ? e.data.json() : {}; } catch (_) {}
+  try {
+    if (e.data) data = e.data.json();
+  } catch (_) {
+    // payload wasn't JSON — try text
+    try { data = { b: e.data.text() }; } catch (_2) {}
+  }
 
-  const senderName = data.s || 'PopChats';
-  const body = data.b || 'sent you a message';
+  const title = data.s || 'PopChats';
+  const body = data.b || 'New message';
   const chatId = data.c || '';
-  const icon = data.i || '/icon-192.png';
+  const icon = data.i || 'https://popchats.zenvx.in/icon-192.png';
 
-  const notifPromise = self.registration.showNotification(senderName, {
-    body,
-    icon,
-    badge: '/icon-192.png',
-    tag: chatId ? 'popchats-chat-' + chatId : 'popchats-msg',
-    renotify: true,
-    requireInteraction: true,
-    data: { chatId, url: chatId ? `/?chat=${encodeURIComponent(chatId)}` : '/' },
-  }).catch(() => {
-    // Fallback: show a plain notification so Chrome doesn't show the generic one
-    return self.registration.showNotification('PopChats', { body: 'New message' });
-  });
-
-  e.waitUntil(notifPromise);
+  e.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon,
+      badge: 'https://popchats.zenvx.in/icon-192.png',
+      tag: chatId ? 'popchats-chat-' + chatId : 'popchats-msg',
+      renotify: true,
+      data: { chatId, url: chatId ? `/?chat=${encodeURIComponent(chatId)}` : '/' },
+    })
+  );
 });
 
 self.addEventListener('notificationclick', (e) => {
