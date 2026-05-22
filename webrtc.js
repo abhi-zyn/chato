@@ -378,27 +378,25 @@ window.WebRTCCall = (function () {
 
   async function endCall() {
     console.log('[endCall] called, currentCall:', !!currentCall);
-    const wasInCall = !!currentCall;
-    const roomId = currentCall && currentCall.roomId;
-    const callMeta = currentCall ? {
+    if (!currentCall) { hideCallUI(); return; }
+    
+    const roomId = currentCall.roomId;
+    const callMeta = {
       initiator: currentCall.initiator,
       friendId: currentCall.friendId,
       answered: !!currentCall._answered,
       video: !!currentCall.video
-    } : null;
-    const shouldLog = wasInCall && callMeta && callMeta.friendId && callMeta.initiator && !_callLogged;
+    };
+    const shouldLog = callMeta.initiator && !_callLogged;
     if (shouldLog) _callLogged = true;
 
+    // Clear call state immediately to prevent re-entry
     stopRingtone();
-    if (currentCall && currentCall._timer) {
-      clearInterval(currentCall._timer);
-      currentCall._timer = null;
-    }
+    if (currentCall._timer) clearInterval(currentCall._timer);
     if (controlsHideTimer) { clearTimeout(controlsHideTimer); controlsHideTimer = null; }
+    currentCall = null;
 
-    if (wasInCall && roomId) {
-      sendSignal(roomId, 'bye', {}).catch(() => {});
-    }
+    if (roomId) sendSignal(roomId, 'bye', {}).catch(() => {});
 
     if (localStream) localStream.getTracks().forEach(t => t.stop());
     if (pc) { try { pc.close(); } catch (_) {} }
@@ -407,7 +405,6 @@ window.WebRTCCall = (function () {
     pc = null;
     localStream = null;
     remoteStream = null;
-    currentCall = null;
     signalChannel = null;
     pendingIce = [];
 
@@ -415,11 +412,12 @@ window.WebRTCCall = (function () {
       window.sb.from('signaling').delete().eq('room_id', roomId).then(() => {}).catch(() => {});
     }
 
-    // Log call to database (only initiator logs, only once)
-    if (shouldLog) {
+    // Log call to database (only initiator, only once)
+    if (shouldLog && callMeta.friendId) {
       const myId = getMyUserId();
       if (myId) {
         const kind = callMeta.answered ? 'voice' : 'missed';
+        console.log('[call log] saving:', kind);
         window.sb.from('calls').insert([{
           caller_id: myId,
           callee_id: callMeta.friendId,
@@ -429,8 +427,6 @@ window.WebRTCCall = (function () {
           else console.log('[call log] saved:', kind);
         }).catch(e => console.error('[call log]', e));
       }
-    } else if (wasInCall) {
-      console.log('[call log] not logging:', { initiator: callMeta && callMeta.initiator, logged: _callLogged });
     }
 
     hideCallUI();
