@@ -26,6 +26,7 @@ let me = null;          // current profile row from public.profiles
 let activeChat = null;  // { id, other }
 let messageSub = null;  // realtime channel for active chat
 let chatReadsSub = null; // realtime channel for chat_members updates (Seen)
+let chatReadsPollId = null;  // polling fallback for read state
 let allMessagesSub = null; // global realtime channel for ALL my chats
 let messagePoller = null;  // polling fallback handle
 let friendActivitySub = null;  // realtime channel for friend requests
@@ -851,18 +852,27 @@ async function openChat(chatId, otherProfile, isStranger) {
     otherLastReadAt = row.last_read_at;
     renderSeenIndicator();
   });
-  // Initial fetch of all members' read state
-  PopChatsDB.getChatReadStates(chatId).then(states => {
+  // Initial fetch + polling fallback for read state. Realtime may not fire
+  // (publication issues, RLS, dropped websocket), so we refetch every 10s
+  // while the chat is open so the read tick reliably upgrades.
+  async function refreshReadStates() {
     if (!activeChat || activeChat.id !== chatId) return;
-    Object.entries(states).forEach(([uid, ts]) => {
-      if (me && uid !== me.id) {
-        if (!otherLastReadAt || new Date(ts) > new Date(otherLastReadAt)) {
-          otherLastReadAt = ts;
+    try {
+      const states = await PopChatsDB.getChatReadStates(chatId);
+      if (!activeChat || activeChat.id !== chatId) return;
+      Object.entries(states).forEach(([uid, ts]) => {
+        if (me && uid !== me.id) {
+          if (!otherLastReadAt || new Date(ts) > new Date(otherLastReadAt)) {
+            otherLastReadAt = ts;
+          }
         }
-      }
-    });
-    applyReadReceipts();
-  }).catch(() => {});
+      });
+      applyReadReceipts();
+    } catch (_) {}
+  }
+  refreshReadStates();
+  if (chatReadsPollId) { clearInterval(chatReadsPollId); chatReadsPollId = null; }
+  chatReadsPollId = setInterval(refreshReadStates, 10000);
 
   // Find out if the recipient has a push subscription registered. Used by
   // applyReadReceipts to decide whether messages count as "delivered" when
@@ -2502,6 +2512,7 @@ function bootUnauthed() {
   _cache.messages = {};
   if (messageSub) { PopChatsDB.unsubscribe(messageSub); messageSub = null; }
   if (chatReadsSub) { PopChatsDB.unsubscribe(chatReadsSub); chatReadsSub = null; }
+  if (chatReadsPollId) { clearInterval(chatReadsPollId); chatReadsPollId = null; }
   stopConvHeaderTick();
   if (friendActivitySub) { PopChatsDB.unsubscribe(friendActivitySub); friendActivitySub = null; }
   if (allMessagesSub) { PopChatsDB.unsubscribe(allMessagesSub); allMessagesSub = null; }
@@ -2543,6 +2554,7 @@ function bootUnauthed() {
   document.getElementById('backBtn').addEventListener('click', () => {
     if (messageSub) { PopChatsDB.unsubscribe(messageSub); messageSub = null; }
     if (chatReadsSub) { PopChatsDB.unsubscribe(chatReadsSub); chatReadsSub = null; }
+    if (chatReadsPollId) { clearInterval(chatReadsPollId); chatReadsPollId = null; }
     stopConvHeaderTick();
     activeChat = null;
     otherLastReadAt = null;
