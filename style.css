@@ -29,7 +29,7 @@ html,body { height:100%; width:100%; overflow:hidden; overscroll-behavior:none; 
 .header h1{font-size:32px;font-weight:700;letter-spacing:-0.8px}
 .header-actions{display:flex;gap:10px}
 
-.glass-btn{width:44px;height:44px;border-radius:14px;border:1px solid rgba(255,255,255,0.22);background:rgba(255,255,255,0.08);backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);position:relative;overflow:hidden}
+.glass-btn{width:44px;height:44px;border-radius:14px;border:1px solid rgba(255,255,255,0.22);background:rgba(255,255,255,0.08);backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);position:relative;overflow:hidden;pointer-events:auto}
 .glass-btn::before{content:'';position:absolute;inset:0;border-radius:14px;background:linear-gradient(135deg,rgba(255,255,255,0.4) 0%,rgba(255,255,255,0.08) 100%);pointer-events:none}
 .glass-btn:active{transform:scale(0.92)}
 .glass-btn svg{width:20px;height:20px;position:relative;z-index:1;stroke:#1a1a1a;stroke-width:2;fill:none}
@@ -735,6 +735,9 @@ html,body { height:100%; width:100%; overflow:hidden; overscroll-behavior:none; 
 }
 .call-overlay[data-state="outgoing"] .call-controls,
 .call-overlay[data-state="active"]   .call-controls{display:flex}
+
+/* Hide video button during voice calls */
+.call-overlay:not([data-video="true"]) #videoBtn{display:none}
 
 .call-btn{
   display:flex;flex-direction:column;align-items:center;gap:6px;
