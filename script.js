@@ -2007,18 +2007,19 @@ async function loadCallsScreen() {
   container.innerHTML = calls.map(c => {
     const otherId = c.caller_id === me.id ? c.callee_id : c.caller_id;
     const other = profilesMap[otherId] || {};
-    const isMissed = c.kind === 'missed';
     const isOutgoing = c.caller_id === me.id;
-    const arrow = isMissed ? 'missed' : (isOutgoing ? 'outgoing' : 'incoming');
-    const sym   = isMissed ? '&#10006;' : (isOutgoing ? '&#8599;' : '&#8601;');
-    const typeLabel = isMissed ? 'Missed' : (c.kind === 'video' ? 'Video' : 'Voice');
+    const isMissed = c.kind === 'missed';
+    const isUnanswered = c.kind === 'unanswered';
+    const arrow = isMissed ? 'missed' : isUnanswered ? 'outgoing' : (isOutgoing ? 'outgoing' : 'incoming');
+    const sym = isMissed ? '↙' : isUnanswered ? '↗' : (isOutgoing ? '↗' : '↙');
+    const typeLabel = isMissed ? 'Missed' : isUnanswered ? 'Not answered' : (c.kind === 'video' ? 'Video' : 'Voice');
     return `
       <div class="notif-item">
         <div class="avatar"><img src="${avatarOf(other)}" alt=""/></div>
         <div class="notif-info">
           <div class="notif-text">
             <strong>${escapeHtml(other.full_name || other.display_name || other.username || 'Unknown')}</strong>
-            <div class="call-meta ${arrow}">${sym} ${typeLabel} · ${arrow}</div>
+            <div class="call-meta ${arrow}">${sym} ${typeLabel}</div>
           </div>
           <div class="notif-time">${formatTime(c.created_at)}</div>
         </div>

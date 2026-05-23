@@ -387,7 +387,7 @@ window.WebRTCCall = (function () {
       answered: !!currentCall._answered,
       video: !!currentCall.video
     };
-    const shouldLog = callMeta.initiator && !_callLogged;
+    const shouldLog = !_callLogged;
     if (shouldLog) _callLogged = true;
 
     // Clear call state immediately to prevent re-entry
@@ -412,15 +412,15 @@ window.WebRTCCall = (function () {
       window.sb.from('signaling').delete().eq('room_id', roomId).then(() => {}).catch(() => {});
     }
 
-    // Log call to database (only initiator, only once)
+    // Log call to database (both sides log, only once)
     if (shouldLog && callMeta.friendId) {
       const myId = getMyUserId();
       if (myId) {
-        const kind = callMeta.answered ? 'voice' : 'missed';
+        const kind = callMeta.answered ? 'voice' : (callMeta.initiator ? 'unanswered' : 'missed');
         console.log('[call log] saving:', kind);
         window.sb.from('calls').insert([{
-          caller_id: myId,
-          callee_id: callMeta.friendId,
+          caller_id: callMeta.initiator ? myId : callMeta.friendId,
+          callee_id: callMeta.initiator ? callMeta.friendId : myId,
           kind
         }]).then(({ error }) => {
           if (error) console.error('[call log] insert failed:', error.message);
