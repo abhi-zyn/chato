@@ -31,17 +31,29 @@ Go to **Supabase Dashboard → Database → Webhooks** and create a new webhook:
   Authorization: Bearer <WEBHOOK_SECRET>
   Content-Type: application/json
   ```
+  ⚠️ **Important**: Use the same `WEBHOOK_SECRET` value you set in step 3 below. This is NOT the VAPID key - it's a separate secret you generate for webhook authentication.
+  
 - **HTTP Params**: Leave empty
 - **Conditions**: Add filter `type = 'offer'` (only trigger on call offers, not ICE candidates)
 
-### 3. Set Required Secrets (if not already set)
+### 3. Set Required Secrets
+
+Generate a random secret for webhook authentication and set all required secrets:
 
 ```bash
-supabase secrets set WEBHOOK_SECRET=<generate-random-secret>
+# Generate a random webhook secret (or use any secure random string)
+supabase secrets set WEBHOOK_SECRET=<generate-random-secret-here>
+
+# VAPID keys for Web Push (if not already set from message push setup)
 supabase secrets set VAPID_PUBLIC_KEY=<your-vapid-public-key>
 supabase secrets set VAPID_PRIVATE_KEY=<your-vapid-private-key>
 supabase secrets set VAPID_SUBJECT=mailto:your-email@example.com
 ```
+
+**Note**: 
+- `WEBHOOK_SECRET` is used to authenticate the database webhook → edge function call
+- `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` are used for Web Push authentication
+- These are different secrets with different purposes
 
 ## How It Works
 
