@@ -1,5 +1,5 @@
 // PopChats Service Worker — PWA shell cache + Web Push receiver.
-const CACHE_NAME = 'popchats-v6';
+const CACHE_NAME = 'popchats-v7';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -60,16 +60,33 @@ self.addEventListener('fetch', (e) => {
 });
 
 // ---------- Web Push ----------
-// Tiny payload: { c: chatId, s: senderName, b: bodyPreview, i: avatarUrl }
+// Message payload: { c: chatId, s: senderName, b: bodyPreview }
+// Call payload: { type: 'call', callType: 'voice'|'video', caller: name, roomId: id }
 self.addEventListener('push', (e) => {
   let data = {};
   try {
     if (e.data) data = e.data.json();
   } catch (_) {
-    // payload wasn't JSON — try text
     try { data = { b: e.data.text() }; } catch (_2) {}
   }
 
+  // Handle incoming call notification
+  if (data.type === 'call') {
+    const title = `Incoming ${data.callType || 'voice'} call`;
+    const body = `${data.caller || 'Someone'} is calling...`;
+    e.waitUntil(
+      self.registration.showNotification(title, {
+        body,
+        tag: 'popchats-call-' + (data.roomId || Date.now()),
+        requireInteraction: true,
+        vibrate: [200, 100, 200, 100, 200],
+        data: { type: 'call', roomId: data.roomId, url: '/' },
+      })
+    );
+    return;
+  }
+
+  // Handle message notification
   const title = data.s || 'PopChats';
   const body = data.b || 'New message';
   const chatId = data.c || '';
@@ -86,24 +103,35 @@ self.addEventListener('push', (e) => {
 
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
-  const targetUrl = (e.notification.data && e.notification.data.url) || '/';
+  const notifData = e.notification.data || {};
+  const targetUrl = notifData.url || '/';
+  
   e.waitUntil((async () => {
     const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    // If we already have a tab open, focus it and tell it to open the chat.
+    
+    // For call notifications, always open/focus the app
+    if (notifData.type === 'call') {
+      for (const c of allClients) {
+        if ('focus' in c) {
+          try {
+            c.postMessage({ type: 'popchats-incoming-call', roomId: notifData.roomId });
+          } catch (_) {}
+          return c.focus();
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
+      return;
+    }
+    
+    // For message notifications, open the chat
     for (const c of allClients) {
       if ('focus' in c) {
         try {
-          c.postMessage({
-            type: 'popchats-open-chat',
-            chatId: e.notification.data && e.notification.data.chatId,
-          });
+          c.postMessage({ type: 'popchats-open-chat', chatId: notifData.chatId });
         } catch (_) {}
         return c.focus();
       }
     }
-    // Otherwise open a new tab.
-    if (self.clients.openWindow) {
-      return self.clients.openWindow(targetUrl);
-    }
+    if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
   })());
 });
