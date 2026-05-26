@@ -1,6 +1,10 @@
 -- Add reply_to column to messages
 alter table public.messages add column if not exists reply_to uuid references public.messages(id) on delete set null;
 
+-- Drop old functions to allow return type changes
+drop function if exists public.send_message_encrypted(uuid, text);
+drop function if exists public.list_messages_decrypted(uuid);
+
 -- Update send_message_encrypted to accept reply_to
 create or replace function public.send_message_encrypted(_chat_id uuid, _text text, _reply_to uuid default null)
 returns table (
