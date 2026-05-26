@@ -3,6 +3,7 @@ alter table public.messages add column if not exists reply_to uuid references pu
 
 -- Drop old functions to allow return type changes
 drop function if exists public.send_message_encrypted(uuid, text);
+drop function if exists public.send_message_encrypted(uuid, text, uuid);
 drop function if exists public.list_messages_decrypted(uuid);
 
 -- Update send_message_encrypted to accept reply_to
