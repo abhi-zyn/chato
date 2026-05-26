@@ -1,5 +1,5 @@
 // PopChats Service Worker — PWA shell cache + Web Push receiver.
-const CACHE_NAME = 'popchats-v7';
+const CACHE_NAME = 'popchats-v8';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -32,6 +32,11 @@ self.addEventListener('activate', (e) => {
     )
   );
   self.clients.claim();
+});
+
+// Listen for skip waiting message from client
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 // Fetch: serve same-origin GETs from cache-first, with a stale-while-revalidate

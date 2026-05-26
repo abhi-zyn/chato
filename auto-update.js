@@ -98,7 +98,17 @@
     document.body.appendChild(updateBanner);
     setTimeout(() => updateBanner.classList.add('show'), 50);
 
-    updateBanner.querySelector('.ub-refresh').onclick = () => {
+    updateBanner.querySelector('.ub-refresh').onclick = async () => {
+      // Force service worker update and clear old caches
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) {
+          await reg.update();
+          if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
       window.location.reload();
     };
     updateBanner.querySelector('.ub-later').onclick = () => {
@@ -120,6 +130,12 @@
 
   // Init
   function init() {
+    // Force SW update check on every load (critical for installed PWAs)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then(reg => {
+        if (reg) reg.update();
+      });
+    }
     if (askPermission()) {
       startPolling();
     } else {

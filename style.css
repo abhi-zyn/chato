@@ -952,3 +952,6 @@ html,body { height:100%; width:100%; overflow:hidden; overscroll-behavior:none; 
 /* Highlight when scrolling to replied message */
 .msg-row.msg-highlight .msg-bubble{animation:msgHighlight 1.5s ease}
 @keyframes msgHighlight{0%,30%{background:rgba(0,188,212,0.2)}100%{background:inherit}}
+
+/* Prevent text selection on long-press */
+.msg-row{-webkit-user-select:none;user-select:none}

@@ -2656,10 +2656,11 @@ if (msgBox) {
     const row = e.target.closest('.msg-row');
     if (!row) return;
     _longPressTimer = setTimeout(() => {
+      window.getSelection().removeAllRanges();
       const t = e.touches[0];
       showMsgMenu(row, t.clientX, t.clientY);
     }, 500);
-  }, { passive: true });
+  });
   msgBox.addEventListener('touchend', () => { clearTimeout(_longPressTimer); });
   msgBox.addEventListener('touchmove', () => { clearTimeout(_longPressTimer); });
   // Click on reply reference to scroll to original
