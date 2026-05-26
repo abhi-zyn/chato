@@ -37,6 +37,7 @@ let activeRequestTab = 'incoming';
 let otherLastReadAt = null;    // ISO timestamp of when the other user last read activeChat
 let otherHasPush = false;      // does the recipient have any push subscription?
 let convHeaderTickId = null;   // setInterval to keep "last seen X ago" fresh
+let _replyTo = null;           // { id, text } — message being replied to
 
 // ---------- Time formatting helpers ----------
 // Returns a short human-readable status for the conv header / chat cards.
@@ -1081,12 +1082,17 @@ function appendMessage(m, animate = true, idx = 0) {
   const r = document.createElement('div');
   r.id = 'msg-' + m.id;
   r.className = 'msg-row ' + (isMine ? 'sent' : 'received');
+  r.setAttribute('data-msg-text', m.text);
   if (animate) r.style.animationDelay = (idx * 0.05) + 's';
   // Initial tick state for sent messages = 'sent' (single tick). The state
   // machine in applyReadReceipts upgrades to 'delivered' or 'read' based on
   // recipient reachability + read pointer.
   const tickHTML = isMine ? tickSvg('sent') : '';
+  const replyHTML = m.reply_to && m.reply_text
+    ? `<div class="msg-reply-ref" data-reply-id="${m.reply_to}"><span class="reply-ref-text">${escapeHtml(m.reply_text.slice(0, 80))}</span></div>`
+    : '';
   r.innerHTML =
+    replyHTML +
     `<div class="msg-bubble">${escapeHtml(m.text)}</div>` +
     `<div class="msg-time">` +
       `<span class="msg-time-text">${formatTime(m.created_at)}</span>` +
@@ -1207,6 +1213,9 @@ async function sendMsg() {
   }
   msgInput.value = '';
 
+  const replyTo = _replyTo;
+  clearReply();
+
   // Optimistic local echo with pop animation
   const tempId = 'temp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
   const sendingChatId = activeChat.id;
@@ -1218,7 +1227,11 @@ async function sendMsg() {
   r.setAttribute('data-pending', 'true');
   r.setAttribute('data-pending-text', txt);
   r.setAttribute('data-tick', 'sent');
+  const replyHTML = replyTo
+    ? `<div class="msg-reply-ref"><span class="reply-ref-text">${escapeHtml(replyTo.text.slice(0, 80))}</span></div>`
+    : '';
   r.innerHTML =
+    replyHTML +
     `<div class="msg-bubble">${escapeHtml(txt)}</div>` +
     `<div class="msg-time">` +
       `<span class="msg-time-text">${formatTime(new Date().toISOString())}</span>` +
@@ -1234,7 +1247,7 @@ async function sendMsg() {
   setTimeout(() => r.classList.add('settled'), 500);
 
   try {
-    const saved = await PopChatsDB.sendMessage(sendingChatId, txt);
+    const saved = await PopChatsDB.sendMessage(sendingChatId, txt, replyTo ? replyTo.id : undefined);
     if (saved && saved.id) {
       // Ensure chat_id is present for caching (RPC returns it; insert fallback too)
       if (!saved.chat_id) saved.chat_id = sendingChatId;
@@ -2543,6 +2556,129 @@ function bootUnauthed() {
   setRequestsBadge(0);
   showScreen('login');
 }
+
+// ---------- Message context menu (Reply / Delete) ----------
+let _msgMenuEl = null;
+let _longPressTimer = null;
+
+function createMsgMenu() {
+  if (_msgMenuEl) return _msgMenuEl;
+  const d = document.createElement('div');
+  d.className = 'msg-context-menu';
+  d.innerHTML = '<button data-action="reply">Reply</button><button data-action="delete">Delete</button>';
+  d.addEventListener('click', e => {
+    const action = e.target.dataset.action;
+    const msgId = d.dataset.msgId;
+    const msgText = d.dataset.msgText;
+    const isMine = d.dataset.mine === '1';
+    hideMsgMenu();
+    if (action === 'reply') setReply(msgId, msgText);
+    if (action === 'delete' && isMine) confirmDeleteMsg(msgId);
+  });
+  document.body.appendChild(d);
+  _msgMenuEl = d;
+  return d;
+}
+
+function showMsgMenu(msgRow, x, y) {
+  const menu = createMsgMenu();
+  const id = msgRow.id.replace('msg-', '');
+  const isMine = msgRow.classList.contains('sent');
+  menu.dataset.msgId = id;
+  menu.dataset.msgText = msgRow.getAttribute('data-msg-text') || msgRow.querySelector('.msg-bubble')?.textContent || '';
+  menu.dataset.mine = isMine ? '1' : '0';
+  // Show/hide delete based on ownership
+  menu.querySelector('[data-action="delete"]').style.display = isMine ? '' : 'none';
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  menu.classList.add('visible');
+  // Adjust if off-screen
+  requestAnimationFrame(() => {
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) menu.style.left = (window.innerWidth - rect.width - 8) + 'px';
+    if (rect.bottom > window.innerHeight) menu.style.top = (window.innerHeight - rect.height - 8) + 'px';
+  });
+}
+
+function hideMsgMenu() {
+  if (_msgMenuEl) _msgMenuEl.classList.remove('visible');
+}
+
+function setReply(msgId, text) {
+  _replyTo = { id: msgId, text };
+  let bar = document.getElementById('replyBar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'replyBar';
+    bar.className = 'reply-bar';
+    bar.innerHTML = '<span class="reply-bar-text"></span><button class="reply-bar-close">&times;</button>';
+    bar.querySelector('.reply-bar-close').addEventListener('click', clearReply);
+    const inputWrap = document.querySelector('.input-wrap');
+    inputWrap.parentNode.insertBefore(bar, inputWrap);
+  }
+  bar.querySelector('.reply-bar-text').textContent = text.slice(0, 100);
+  bar.hidden = false;
+  msgInput.focus();
+}
+
+function clearReply() {
+  _replyTo = null;
+  const bar = document.getElementById('replyBar');
+  if (bar) bar.hidden = true;
+}
+
+async function confirmDeleteMsg(msgId) {
+  if (!confirm('Delete this message?')) return;
+  try {
+    await PopChatsDB.deleteMessage(msgId);
+    const el = document.getElementById('msg-' + msgId);
+    if (el) el.remove();
+    // Remove from cache
+    if (activeChat && _cache.messages[activeChat.id]) {
+      _cache.messages[activeChat.id] = _cache.messages[activeChat.id].filter(m => m.id !== msgId);
+      _cache.saveMessages();
+    }
+  } catch (e) {
+    toast('Failed to delete message');
+    console.error(e);
+  }
+}
+
+// Long-press / right-click on messages
+if (msgBox) {
+  msgBox.addEventListener('contextmenu', e => {
+    const row = e.target.closest('.msg-row');
+    if (!row) return;
+    e.preventDefault();
+    showMsgMenu(row, e.clientX, e.clientY);
+  });
+  msgBox.addEventListener('touchstart', e => {
+    const row = e.target.closest('.msg-row');
+    if (!row) return;
+    _longPressTimer = setTimeout(() => {
+      const t = e.touches[0];
+      showMsgMenu(row, t.clientX, t.clientY);
+    }, 500);
+  }, { passive: true });
+  msgBox.addEventListener('touchend', () => { clearTimeout(_longPressTimer); });
+  msgBox.addEventListener('touchmove', () => { clearTimeout(_longPressTimer); });
+  // Click on reply reference to scroll to original
+  msgBox.addEventListener('click', e => {
+    const ref = e.target.closest('.msg-reply-ref');
+    if (!ref) return;
+    const targetId = ref.dataset.replyId;
+    if (!targetId) return;
+    const target = document.getElementById('msg-' + targetId);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target.classList.add('msg-highlight');
+      setTimeout(() => target.classList.remove('msg-highlight'), 1500);
+    }
+  });
+}
+document.addEventListener('click', e => {
+  if (_msgMenuEl && !_msgMenuEl.contains(e.target)) hideMsgMenu();
+});
 
 // ---------- Init ----------
 (async function init() {

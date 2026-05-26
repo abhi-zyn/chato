@@ -463,21 +463,33 @@ window.PopChatsDB = (function () {
     return r2.data || [];
   }
 
-  async function sendMessage(chatId, text) {
+  async function sendMessage(chatId, text, replyTo) {
     const id = await uid(); if (!id) throw new Error('Not signed in');
     // Try encrypted RPC first; fall back to direct insert if migration not run
-    const { data, error } = await client().rpc('send_message_encrypted',
-      { _chat_id: chatId, _text: text });
+    const params = { _chat_id: chatId, _text: text };
+    if (replyTo) params._reply_to = replyTo;
+    const { data, error } = await client().rpc('send_message_encrypted', params);
     if (!error) {
       if (Array.isArray(data) && data.length) return data[0];
       return data;
     }
     console.warn('[sendMessage] RPC failed, falling back to direct insert:', error.message);
+    const row = { chat_id: chatId, sender_id: id, text };
+    if (replyTo) row.reply_to = replyTo;
     const { data: d2, error: e2 } = await client().from('messages')
-      .insert({ chat_id: chatId, sender_id: id, text })
-      .select().single();
+      .insert(row).select().single();
     if (e2) throw e2;
     return d2;
+  }
+
+  async function deleteMessage(messageId) {
+    const id = await uid(); if (!id) throw new Error('Not signed in');
+    const { error } = await client().rpc('delete_message', { _message_id: messageId });
+    if (error) {
+      // Fallback to direct delete
+      const { error: e2 } = await client().from('messages').delete().eq('id', messageId).eq('sender_id', id);
+      if (e2) throw e2;
+    }
   }
 
   async function decryptMessage(id) {
@@ -754,7 +766,7 @@ window.PopChatsDB = (function () {
     subscribeToFriendActivity,
     listMyChats, getChatMembers,
     getOrCreateDM, startStrangerChat, pickRandomStranger,
-    listMessages, sendMessage, subscribeToChat, subscribeToAllMyMessages, startMessagePolling, unsubscribe,
+    listMessages, sendMessage, deleteMessage, subscribeToChat, subscribeToAllMyMessages, startMessagePolling, unsubscribe,
     decryptMessage, lastMessagePreview,
     markChatRead, getChatReadStates, subscribeToChatReads,
     savePushSubscription, deletePushSubscription, userHasPushSubscription,
