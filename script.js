@@ -581,6 +581,10 @@ function handleIncomingMessage(msg) {
     }
   }
 
+  // Check mute before sound/notification
+  const _mutedMap = JSON.parse(localStorage.getItem('popchats.muted') || '{}');
+  if (_mutedMap[msg.sender_id]) return;
+
   // Subtle ping sound (optional, only if permitted)
   playMessagePing();
   // Browser notification for the message (if permission granted)
@@ -641,17 +645,12 @@ function notifSupported() {
 async function ensureNotificationPermission() {
   if (!notifSupported()) return 'unsupported';
   if (Notification.permission === 'granted') {
-    // Already granted — make sure the device is registered for background push.
     ensurePushSubscription().catch(() => {});
     return 'granted';
   }
   if (Notification.permission === 'denied') return 'denied';
-  // Don't pop the prompt more than once per session — browsers throttle
-  // anyway, but this avoids surprising the user mid-session.
-  try {
-    if (sessionStorage.getItem(NOTIF_PERM_KEY) === '1') return Notification.permission;
-    sessionStorage.setItem(NOTIF_PERM_KEY, '1');
-  } catch (_) {}
+  // Prompt the user — browsers require a user gesture on some platforms,
+  // but many (Android Chrome, desktop) allow prompting from JS directly.
   try {
     const res = await Notification.requestPermission();
     if (res === 'granted') ensurePushSubscription().catch(() => {});
@@ -687,6 +686,8 @@ async function ensurePushSubscription() {
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
 
+    // Always re-subscribe to ensure the subscription stays fresh and
+    // the push service doesn't expire it silently.
     if (!sub) {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
@@ -695,8 +696,6 @@ async function ensurePushSubscription() {
     }
     if (sub) {
       await PopChatsDB.savePushSubscription(sub.toJSON());
-      // Background push works → loosen the foreground polling fallback so we
-      // use less mobile data while idle.
       _bgPushActive = true;
     }
   } catch (e) {
@@ -935,7 +934,7 @@ async function refreshConvFriendGate() {
         `<div class="conv-banner-actions">` +
           `<button class="btn-ghost" data-act="cancel">Cancel request</button>` +
         `</div>`;
-    } else if (state === 'blocked') {
+    } else if (state === 'blocked' || state === 'blocked_by') {
       html = `<div class="conv-banner-text">You can't message this person.</div>`;
     } else {
       html =
@@ -2223,8 +2222,9 @@ async function hydrateFriendSheet(userId) {
   // List rows depend on state
   const listEl = document.getElementById('friendSheetList');
   let rows = '';
+  const isMuted = JSON.parse(localStorage.getItem('popchats.muted') || '{}')[userId];
   if (state === 'friends') {
-    rows += rowHTML('Mute notifications', 'switch', 'mute');
+    rows += rowHTML(isMuted ? 'Unmute notifications' : 'Mute notifications', 'switch', 'mute');
     rows += rowHTML('Search in conversation', 'chev', 'search');
     rows += rowHTML('Media, links, docs', 'chev', 'media');
     rows += rowHTML('Block @' + (full && full.username ? full.username : 'user'), 'danger', 'block');
@@ -2238,8 +2238,15 @@ async function hydrateFriendSheet(userId) {
     rows += rowHTML('Unblock', 'primary', 'unblock');
   } else {
     rows += rowHTML('Add friend', 'primary', 'add');
+    rows += rowHTML('Block @' + (full && full.username ? full.username : 'user'), 'danger', 'block');
   }
   listEl.innerHTML = rows;
+
+  // Mark mute toggle active if currently muted
+  if (isMuted) {
+    const muteBtn = listEl.querySelector('[data-row-act="mute"]');
+    if (muteBtn) muteBtn.classList.add('active');
+  }
 
   listEl.querySelectorAll('button[data-row-act]').forEach(btn => {
     btn.addEventListener('click', () => handleFriendSheetAction(btn.dataset.rowAct, userId, full));
@@ -2274,8 +2281,29 @@ async function handleFriendSheetAction(act, userId, profile) {
       await PopChatsDB.unfriend(userId);
       toast('Removed');
     }
-    else if (act === 'block' || act === 'unblock') { toast('Coming soon'); return; }
-    else if (act === 'mute' || act === 'search' || act === 'media') { toast('Coming soon'); return; }
+    else if (act === 'block' || act === 'unblock') {
+      if (act === 'block') {
+        if (!confirm('Block this user? They won\'t be able to message you.')) return;
+        await PopChatsDB.blockUser(userId);
+        toast('Blocked');
+      } else {
+        await PopChatsDB.unblockUser(userId);
+        toast('Unblocked');
+      }
+    }
+    else if (act === 'mute') {
+      const key = 'popchats.muted';
+      const muted = JSON.parse(localStorage.getItem(key) || '{}');
+      if (muted[userId]) { delete muted[userId]; toast('Unmuted'); }
+      else { muted[userId] = true; toast('Muted'); }
+      localStorage.setItem(key, JSON.stringify(muted));
+    }
+    else if (act === 'search') {
+      closeFriendSheet();
+      openConvSearch();
+      return;
+    }
+    else if (act === 'media') { toast('Coming soon'); return; }
     await hydrateFriendSheet(userId);
     if (activeChat && activeChat.other && activeChat.other.id === userId) {
       await refreshConvFriendGate();
@@ -2287,6 +2315,39 @@ function closeFriendSheet() {
   const sheet = document.getElementById('friendSheet');
   if (sheet) sheet.classList.remove('open');
   document.body.classList.remove('modal-open');
+}
+
+// ---------- Conversation Search ----------
+function openConvSearch() {
+  const bar = document.getElementById('convSearchBar');
+  if (!bar) return;
+  bar.hidden = false;
+  const input = document.getElementById('convSearchInput');
+  if (input) { input.value = ''; setTimeout(() => input.focus(), 100); }
+}
+function closeConvSearch() {
+  const bar = document.getElementById('convSearchBar');
+  if (bar) bar.hidden = true;
+  // Remove highlights
+  if (msgBox) msgBox.querySelectorAll('.msg-bubble.search-hit').forEach(el => el.classList.remove('search-hit'));
+}
+function doConvSearch() {
+  const input = document.getElementById('convSearchInput');
+  if (!input || !msgBox) return;
+  const q = input.value.trim().toLowerCase();
+  // Clear previous highlights
+  msgBox.querySelectorAll('.msg-bubble.search-hit').forEach(el => el.classList.remove('search-hit'));
+  if (!q) return;
+  let firstHit = null;
+  msgBox.querySelectorAll('.msg-row').forEach(row => {
+    const txt = (row.getAttribute('data-msg-text') || row.querySelector('.msg-bubble')?.textContent || '').toLowerCase();
+    if (txt.includes(q)) {
+      const bubble = row.querySelector('.msg-bubble');
+      if (bubble) bubble.classList.add('search-hit');
+      if (!firstHit) firstHit = row;
+    }
+  });
+  if (firstHit) firstHit.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // ---------- Boot / auth gate ----------
@@ -2699,6 +2760,7 @@ document.addEventListener('click', e => {
     if (chatReadsSub) { PopChatsDB.unsubscribe(chatReadsSub); chatReadsSub = null; }
     if (chatReadsPollId) { clearInterval(chatReadsPollId); chatReadsPollId = null; }
     stopConvHeaderTick();
+    closeConvSearch();
     activeChat = null;
     otherLastReadAt = null;
     showScreen('chats', 'chats');
@@ -2790,8 +2852,15 @@ document.addEventListener('click', e => {
     if (e.key === 'Escape') {
       const s = document.getElementById('friendSheet');
       if (s && s.classList.contains('open')) closeFriendSheet();
+      closeConvSearch();
     }
   });
+
+  // Conversation search bar
+  const convSearchClose = document.getElementById('convSearchClose');
+  if (convSearchClose) convSearchClose.addEventListener('click', closeConvSearch);
+  const convSearchInput = document.getElementById('convSearchInput');
+  if (convSearchInput) convSearchInput.addEventListener('input', doConvSearch);
 
   // Bottom nav
   document.querySelectorAll('.nav-btn').forEach(b => {

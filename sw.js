@@ -1,5 +1,5 @@
 // PopChats Service Worker — PWA shell cache + Web Push receiver.
-const CACHE_NAME = 'popchats-v8';
+const CACHE_NAME = 'popchats-v9';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -82,9 +82,12 @@ self.addEventListener('push', (e) => {
     e.waitUntil(
       self.registration.showNotification(title, {
         body,
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
         tag: 'popchats-call-' + (data.roomId || Date.now()),
         requireInteraction: true,
-        vibrate: [200, 100, 200, 100, 200],
+        vibrate: [200, 100, 200, 100, 200, 100, 200],
+        urgency: 'high',
         data: { type: 'call', roomId: data.roomId, url: '/' },
       })
     );
@@ -99,8 +102,13 @@ self.addEventListener('push', (e) => {
   e.waitUntil(
     self.registration.showNotification(title, {
       body,
-      tag: chatId ? 'popchats-chat-' + chatId : 'popchats-msg',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: chatId ? 'popchats-chat-' + chatId : 'popchats-msg-' + Date.now(),
       renotify: true,
+      requireInteraction: true,
+      vibrate: [100, 50, 100],
+      actions: [{ action: 'open', title: 'Open' }],
       data: { chatId, url: chatId ? `/?chat=${encodeURIComponent(chatId)}` : '/' },
     })
   );

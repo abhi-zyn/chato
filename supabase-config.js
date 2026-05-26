@@ -7,4 +7,4 @@ window.POPCHATS_SITE_URL = 'https://popchats.zenvx.in/';
 // `npx web-push generate-vapid-keys`. The PRIVATE key stays as a Supabase
 // Edge Function secret (VAPID_PRIVATE_KEY); never put it here.
 // If empty, web push registration is silently skipped.
-window.VAPID_PUBLIC_KEY = 'BAx6M1of8TBV1eNPJED5mfZs_0HRhpq3xCscH7WJ_GQ0ISDMmQUsgZg3hPEQbBjM-6fsqIZ1zbKc7zQgUAZmraA';
+window.VAPID_PUBLIC_KEY = 'BEBPl_Z6OUvvVGKJsac3Vw_bZO6tfs6BgDDZ0rDPOQYCSzHqDN8WaelTCGUTi6snh-ZfHNhq1fCpU2SHvIiGPLI';

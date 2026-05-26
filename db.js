@@ -257,6 +257,16 @@ window.PopChatsDB = (function () {
     if (error) throw error;
   }
 
+  async function blockUser(otherId) {
+    const { error } = await client().rpc('block_user', { other: otherId });
+    if (error) throw error;
+  }
+
+  async function unblockUser(otherId) {
+    const { error } = await client().rpc('unblock_user', { other: otherId });
+    if (error) throw error;
+  }
+
   async function listFriendRequests() {
     const { data, error } = await client().rpc('list_friend_requests');
     if (error) { console.error('[listFriendRequests]', error); return []; }
@@ -761,7 +771,7 @@ window.PopChatsDB = (function () {
     uploadAvatar, isUsernameAvailable, emailExists,
     friendshipState, friendshipStatesFor,
     sendFriendRequest, acceptFriendRequest, declineFriendRequest,
-    cancelFriendRequest, unfriend,
+    cancelFriendRequest, unfriend, blockUser, unblockUser,
     listFriendRequests, listFriends, friendSince,
     subscribeToFriendActivity,
     listMyChats, getChatMembers,

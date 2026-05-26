@@ -318,6 +318,27 @@ html,body { height:100%; width:100%; overflow:hidden; overscroll-behavior:none; 
 }
 
 /* ----- Conversation banner (non-friend gate) ----- */
+.conv-search-bar{
+  display:flex;align-items:center;gap:8px;
+  margin:8px 16px 0;padding:8px 12px;
+  border-radius:14px;
+  background:rgba(255,255,255,0.12);
+  border:1px solid var(--glass-stroke-soft);
+  backdrop-filter:blur(12px);
+}
+.conv-search-bar input{
+  flex:1;background:transparent;border:0;outline:none;
+  font:inherit;font-size:14px;color:var(--text-primary);
+}
+.conv-search-bar input::placeholder{color:var(--text-secondary)}
+.conv-search-bar button{
+  background:transparent;border:0;color:var(--text-secondary);
+  font-size:18px;cursor:pointer;padding:2px 6px;
+}
+.msg-bubble.search-hit{
+  outline:2px solid rgba(255,200,50,0.8);
+  border-radius:14px;
+}
 .conv-banner{
   display:flex;flex-direction:column;gap:10px;
   margin:10px 16px 0;padding:14px 16px;
@@ -536,6 +557,8 @@ html,body { height:100%; width:100%; overflow:hidden; overscroll-behavior:none; 
   box-shadow:0 1px 3px rgba(0,0,0,0.15);
   transition:transform .2s ease;
 }
+.fs-row[data-row-act="mute"].active .fs-switch{background:#3bcd6e}
+.fs-row[data-row-act="mute"].active .fs-switch::after{transform:translateX(14px)}
 
 /* Conv friend button (chat header) — make it look tappable */
 .conv-friend-btn{

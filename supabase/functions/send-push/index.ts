@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
       keys: { p256dh: s.p256dh, auth: s.auth },
     };
     try {
-      await webpush.sendNotification(sub, data, { TTL: 60 });
+      await webpush.sendNotification(sub, data, { TTL: 86400, urgency: 'high' });
     } catch (err: any) {
       const status = err?.statusCode || err?.status || 0;
       if (status === 404 || status === 410) {
