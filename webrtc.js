@@ -194,13 +194,33 @@ window.WebRTCCall = (function () {
     conn.onconnectionstatechange = () => {
       console.log('[pc] state:', conn.connectionState);
       if (conn.connectionState === 'connected') {
+        if (currentCall && currentCall._disconnectTimer) {
+          clearTimeout(currentCall._disconnectTimer);
+          currentCall._disconnectTimer = null;
+        }
         if (currentCall) currentCall._answered = true;
         showCallUI('active');
-      } else if (conn.connectionState === 'failed' ||
-                 conn.connectionState === 'disconnected' ||
-                 conn.connectionState === 'closed') {
-        // Other side dropped — auto end
+      } else if (conn.connectionState === 'failed' || conn.connectionState === 'closed') {
         if (currentCall) endCall();
+      } else if (conn.connectionState === 'disconnected') {
+        // Debounce — transient disconnects are common during ICE negotiation
+        if (currentCall) {
+          if (currentCall._disconnectTimer) clearTimeout(currentCall._disconnectTimer);
+          currentCall._disconnectTimer = setTimeout(() => {
+            if (pc && pc.connectionState === 'disconnected') endCall();
+          }, 5000);
+        }
+      }
+    };
+
+    // Fallback for browsers that don't fire connectionstatechange reliably
+    conn.oniceconnectionstatechange = () => {
+      console.log('[pc] ice state:', conn.iceConnectionState);
+      if (conn.iceConnectionState === 'connected' || conn.iceConnectionState === 'completed') {
+        if (currentCall && !currentCall._answered) {
+          currentCall._answered = true;
+          showCallUI('active');
+        }
       }
     };
 
@@ -320,7 +340,7 @@ window.WebRTCCall = (function () {
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      await sendSignal(roomId, 'offer', { offer, video });
+      await sendSignal(roomId, 'offer', { offer: { type: offer.type, sdp: offer.sdp }, video });
 
       // Ringback tone for caller until remote answers
       startRingtone('outgoing');
@@ -356,7 +376,7 @@ window.WebRTCCall = (function () {
 
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      await sendSignal(currentCall.roomId, 'answer', { answer });
+      await sendSignal(currentCall.roomId, 'answer', { answer: { type: answer.type, sdp: answer.sdp } });
 
       currentCall._pendingOffer = null;
       // Stay in 'incoming' visually until pc.connectionState === 'connected'
@@ -393,6 +413,7 @@ window.WebRTCCall = (function () {
     // Clear call state immediately to prevent re-entry
     stopRingtone();
     if (currentCall._timer) clearInterval(currentCall._timer);
+    if (currentCall._disconnectTimer) clearTimeout(currentCall._disconnectTimer);
     if (controlsHideTimer) { clearTimeout(controlsHideTimer); controlsHideTimer = null; }
     currentCall = null;
 
