@@ -187,7 +187,7 @@ window.WebRTCCall = (function () {
 
     conn.onicecandidate = (e) => {
       if (e.candidate) {
-        sendSignal(roomId, 'ice-candidate', { candidate: e.candidate });
+        sendSignal(roomId, 'ice-candidate', { candidate: e.candidate.toJSON() });
       }
     };
 
@@ -371,14 +371,22 @@ window.WebRTCCall = (function () {
       pc = createPeerConnection(currentCall.roomId);
       localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 
-      await pc.setRemoteDescription(currentCall._pendingOffer);
+      await pc.setRemoteDescription(new RTCSessionDescription(currentCall._pendingOffer));
       await flushPendingIce();
 
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       await sendSignal(currentCall.roomId, 'answer', { answer: { type: answer.type, sdp: answer.sdp } });
 
+      // Flush again — ICE candidates may have arrived during answer creation
+      await flushPendingIce();
       currentCall._pendingOffer = null;
+      // Keep flushing for a short window to catch late-arriving candidates
+      const _flushInterval = setInterval(async () => {
+        if (!pc || !pc.remoteDescription) { clearInterval(_flushInterval); return; }
+        await flushPendingIce();
+      }, 500);
+      setTimeout(() => clearInterval(_flushInterval), 5000);
       // Stay in 'incoming' visually until pc.connectionState === 'connected'
     } catch (e) {
       console.error('[answerCall]', e);
@@ -456,7 +464,7 @@ window.WebRTCCall = (function () {
   async function flushPendingIce() {
     while (pendingIce.length && pc && pc.remoteDescription) {
       const c = pendingIce.shift();
-      try { await pc.addIceCandidate(c); } catch (e) { console.error('[ice flush]', e); }
+      try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (e) { console.warn('[ice flush]', e.message); }
     }
   }
 
@@ -496,16 +504,18 @@ window.WebRTCCall = (function () {
       } else if (type === 'answer') {
         if (!pc || !pc.localDescription) return;
         stopRingtone();
-        await pc.setRemoteDescription(payload.answer);
+        await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
         await flushPendingIce();
         showCallUI('active');
       } else if (type === 'ice-candidate') {
+        if (!payload.candidate) return;
         if (!pc) {
           pendingIce.push(payload.candidate);
           return;
         }
         if (pc.remoteDescription) {
-          await pc.addIceCandidate(payload.candidate);
+          try { await pc.addIceCandidate(new RTCIceCandidate(payload.candidate)); }
+          catch (e) { console.warn('[ice add]', e.message); }
         } else {
           pendingIce.push(payload.candidate);
         }
