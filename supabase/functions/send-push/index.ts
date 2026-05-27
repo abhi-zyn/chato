@@ -45,6 +45,69 @@ async function sb(path: string, init: RequestInit = {}): Promise<Response> {
   });
 }
 
+// Handle incoming call push notification
+async function handleCallPush(row: any): Promise<Response> {
+  if (!row || row.type !== 'offer' || !row.room_id) {
+    return new Response('ignored', { status: 200 });
+  }
+
+  const callerId = row.payload?.callerId;
+  if (!callerId) return new Response('no callerId in payload', { status: 200 });
+
+  // Extract callee from room_id (format: "call:uuid1_uuid2")
+  const parts = row.room_id.replace(/^call:/, '').split('_');
+  const calleeId = parts.find((p: string) => p !== callerId);
+  if (!calleeId) return new Response('no callee', { status: 200 });
+
+  // Get caller profile
+  const profRes = await sb(
+    `/rest/v1/profiles?id=eq.${callerId}&select=full_name,display_name,username`
+  );
+  const profArr = profRes.ok ? await profRes.json() : [];
+  const caller = profArr[0] ?? {};
+  const callerName = caller.full_name || caller.display_name || ('@' + (caller.username || 'someone'));
+
+  // Get callee push subscriptions
+  const subRes = await sb(
+    `/rest/v1/push_subscriptions?user_id=eq.${calleeId}&select=id,endpoint,p256dh,auth`
+  );
+  if (!subRes.ok) return new Response('subs lookup failed', { status: 500 });
+  const subs: any[] = await subRes.json();
+  if (!subs.length) return new Response('no subscribers', { status: 200 });
+
+  const video = row.payload?.video ? 'video' : 'voice';
+  const data = JSON.stringify({
+    type: 'call',
+    callType: video,
+    caller: callerName,
+    roomId: row.room_id,
+  });
+
+  const dead: string[] = [];
+  await Promise.all(subs.map(async (s: any) => {
+    const sub = { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } };
+    try {
+      await webpush.sendNotification(sub, data, { TTL: 30, urgency: 'high' });
+    } catch (err: any) {
+      const status = err?.statusCode || err?.status || 0;
+      if (status === 404 || status === 410) dead.push(s.endpoint);
+      else console.error('call push error', status, err?.body || err?.message);
+    }
+  }));
+
+  if (dead.length) {
+    const enc = encodeURIComponent;
+    await sb(
+      `/rest/v1/push_subscriptions?endpoint=in.(${dead.map((d) => `"${enc(d)}"`).join(',')})`,
+      { method: 'DELETE' }
+    ).catch(() => {});
+  }
+
+  return new Response(JSON.stringify({ sent: subs.length - dead.length }), {
+    status: 200, headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 Deno.serve(async (req) => {
   // 1. Authenticate the webhook caller — must match the WEBHOOK_SECRET we
   //    configured in the Supabase Database Webhook header.
@@ -58,7 +121,15 @@ Deno.serve(async (req) => {
   catch { return new Response('bad json', { status: 400 }); }
 
   // Supabase webhook envelope: { type, table, schema, record, old_record }
-  if (payload?.type !== 'INSERT' || payload?.table !== 'messages') {
+  if (payload?.type !== 'INSERT') {
+    return new Response('ignored', { status: 200 });
+  }
+
+  // Route: call signaling (offer) or message
+  if (payload?.table === 'signaling') {
+    return handleCallPush(payload.record);
+  }
+  if (payload?.table !== 'messages') {
     return new Response('ignored', { status: 200 });
   }
   const row = payload.record;

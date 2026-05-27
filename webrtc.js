@@ -340,7 +340,7 @@ window.WebRTCCall = (function () {
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      await sendSignal(roomId, 'offer', { offer: { type: offer.type, sdp: offer.sdp }, video });
+      await sendSignal(roomId, 'offer', { offer: { type: offer.type, sdp: offer.sdp }, video, callerId: myId });
 
       // Ringback tone for caller until remote answers
       startRingtone('outgoing');
