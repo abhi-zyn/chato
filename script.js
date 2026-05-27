@@ -934,7 +934,9 @@ async function refreshConvFriendGate() {
         `<div class="conv-banner-actions">` +
           `<button class="btn-ghost" data-act="cancel">Cancel request</button>` +
         `</div>`;
-    } else if (state === 'blocked' || state === 'blocked_by') {
+    } else if (state === 'blocked') {
+      html = `<div class="conv-banner-text">You blocked this chat.</div>`;
+    } else if (state === 'blocked_by') {
       html = `<div class="conv-banner-text">You can't message this person.</div>`;
     } else {
       html =
@@ -959,14 +961,15 @@ async function refreshConvFriendGate() {
       });
     });
   }
-  setSendDisabled(true);
+  const blockMsg = state === 'blocked' ? 'You blocked this chat' : state === 'blocked_by' ? 'You can\'t message this person' : undefined;
+  setSendDisabled(true, blockMsg);
 }
 
-function setSendDisabled(disabled) {
+function setSendDisabled(disabled, placeholder) {
   if (sendBtn) sendBtn.disabled = !!disabled;
   if (msgInput) {
     msgInput.disabled = !!disabled;
-    msgInput.placeholder = disabled ? 'You need to be friends to chat…' : 'Type your message...';
+    msgInput.placeholder = disabled ? (placeholder || 'You need to be friends to chat…') : 'Type your message...';
   }
 }
 
@@ -1207,7 +1210,10 @@ async function sendMsg() {
   if (!txt || !activeChat) return;
   // Hard guard: if input is disabled (non-friend / non-stranger), don't send
   if (msgInput.disabled || (sendBtn && sendBtn.disabled)) {
-    toast('You need to be friends to send messages.');
+    const st = activeChat && activeChat.friendState;
+    if (st === 'blocked') toast('You blocked this chat');
+    else if (st === 'blocked_by') toast('You can\'t message this person');
+    else toast('You need to be friends to send messages.');
     return;
   }
   msgInput.value = '';
@@ -1365,7 +1371,7 @@ function friendActionButtonHTML(state) {
       <button class="result-start-btn" data-friend-act="accept">Accept</button>
     </div>`;
   }
-  if (state === 'blocked' || state === 'self') {
+  if (state === 'blocked' || state === 'blocked_by' || state === 'self') {
     return `<div class="result-action-slot"></div>`;
   }
   return `<div class="result-action-slot"><button class="result-start-btn" data-friend-act="add">Add Friend</button></div>`;
@@ -2235,7 +2241,10 @@ async function hydrateFriendSheet(userId) {
     rows += rowHTML('Accept request', 'primary', 'accept');
     rows += rowHTML('Decline', 'danger', 'decline');
   } else if (state === 'blocked') {
+    rows += rowHTML('Search in conversation', 'chev', 'search');
     rows += rowHTML('Unblock', 'primary', 'unblock');
+  } else if (state === 'blocked_by') {
+    // They blocked you — no actions available
   } else {
     rows += rowHTML('Add friend', 'primary', 'add');
     rows += rowHTML('Block @' + (full && full.username ? full.username : 'user'), 'danger', 'block');
@@ -2318,36 +2327,65 @@ function closeFriendSheet() {
 }
 
 // ---------- Conversation Search ----------
+let _convSearchHits = [];
+let _convSearchIdx = -1;
+
 function openConvSearch() {
   const bar = document.getElementById('convSearchBar');
   if (!bar) return;
   bar.hidden = false;
+  _convSearchHits = [];
+  _convSearchIdx = -1;
   const input = document.getElementById('convSearchInput');
   if (input) { input.value = ''; setTimeout(() => input.focus(), 100); }
+  updateConvSearchCount();
 }
 function closeConvSearch() {
   const bar = document.getElementById('convSearchBar');
   if (bar) bar.hidden = true;
-  // Remove highlights
+  _convSearchHits = [];
+  _convSearchIdx = -1;
   if (msgBox) msgBox.querySelectorAll('.msg-bubble.search-hit').forEach(el => el.classList.remove('search-hit'));
+  msgBox && msgBox.querySelectorAll('.msg-bubble.search-active').forEach(el => el.classList.remove('search-active'));
+  updateConvSearchCount();
+}
+function updateConvSearchCount() {
+  const el = document.getElementById('convSearchCount');
+  if (!el) return;
+  if (_convSearchHits.length === 0) { el.textContent = ''; return; }
+  el.textContent = (_convSearchIdx + 1) + '/' + _convSearchHits.length;
 }
 function doConvSearch() {
   const input = document.getElementById('convSearchInput');
   if (!input || !msgBox) return;
   const q = input.value.trim().toLowerCase();
-  // Clear previous highlights
   msgBox.querySelectorAll('.msg-bubble.search-hit').forEach(el => el.classList.remove('search-hit'));
-  if (!q) return;
-  let firstHit = null;
+  msgBox.querySelectorAll('.msg-bubble.search-active').forEach(el => el.classList.remove('search-active'));
+  _convSearchHits = [];
+  _convSearchIdx = -1;
+  if (!q) { updateConvSearchCount(); return; }
   msgBox.querySelectorAll('.msg-row').forEach(row => {
     const txt = (row.getAttribute('data-msg-text') || row.querySelector('.msg-bubble')?.textContent || '').toLowerCase();
     if (txt.includes(q)) {
       const bubble = row.querySelector('.msg-bubble');
-      if (bubble) bubble.classList.add('search-hit');
-      if (!firstHit) firstHit = row;
+      if (bubble) { bubble.classList.add('search-hit'); _convSearchHits.push(row); }
     }
   });
-  if (firstHit) firstHit.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (_convSearchHits.length) {
+    _convSearchIdx = 0;
+    _convSearchHits[0].querySelector('.msg-bubble').classList.add('search-active');
+    _convSearchHits[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  updateConvSearchCount();
+}
+function convSearchNav(dir) {
+  if (!_convSearchHits.length) return;
+  _convSearchHits[_convSearchIdx]?.querySelector('.msg-bubble')?.classList.remove('search-active');
+  _convSearchIdx = (_convSearchIdx + dir + _convSearchHits.length) % _convSearchHits.length;
+  const hit = _convSearchHits[_convSearchIdx];
+  hit.querySelector('.msg-bubble')?.classList.add('search-active');
+  hit.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  updateConvSearchCount();
 }
 
 // ---------- Boot / auth gate ----------
@@ -2860,7 +2898,17 @@ document.addEventListener('click', e => {
   const convSearchClose = document.getElementById('convSearchClose');
   if (convSearchClose) convSearchClose.addEventListener('click', closeConvSearch);
   const convSearchInput = document.getElementById('convSearchInput');
-  if (convSearchInput) convSearchInput.addEventListener('input', doConvSearch);
+  if (convSearchInput) {
+    convSearchInput.addEventListener('input', doConvSearch);
+    convSearchInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); convSearchNav(1); }
+      if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); convSearchNav(-1); }
+    });
+  }
+  const convSearchUp = document.getElementById('convSearchUp');
+  if (convSearchUp) convSearchUp.addEventListener('click', () => convSearchNav(-1));
+  const convSearchDown = document.getElementById('convSearchDown');
+  if (convSearchDown) convSearchDown.addEventListener('click', () => convSearchNav(1));
 
   // Bottom nav
   document.querySelectorAll('.nav-btn').forEach(b => {
