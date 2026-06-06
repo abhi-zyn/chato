@@ -1,0 +1,19 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    - cron: '0 8 * * *'  # Once daily at 8am UTC
+  workflow_dispatch:      # Manual trigger option
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase DB
+        run: |
+          curl -X GET "https://vnrfmumsauwvpfiruryc.supabase.co/auth/v1/health" \
+          -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+          -H "Content-Type: application/json" \
+          --fail \
+          && echo "✅ Supabase is alive" \
+          || echo "❌ Ping failed"
