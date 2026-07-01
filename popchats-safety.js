@@ -1,9 +1,21 @@
 // PopChats — safety & privacy enhancements (loaded via supabase-config.js)
 // 1) Stranger chats show username only (real/full name hidden)
-// 2) Calls gated to friends (server also enforces via migration 019)
-// 3) Delete-account UI wired to the delete-account Edge Function
+// 2) Calls gated to friends (server also enforces via migration 019). The call
+//    icon stays visible; a non-friend tap shows a friendly toast instead.
+// 3) Profile-picture uploads are scanned by the moderate-avatar Edge Function
+// 4) Delete-account UI wired to the delete-account Edge Function
 (function () {
   'use strict';
+
+  // ---------- tiny toast ----------
+  function toast(text) {
+    var t = document.createElement('div');
+    t.textContent = text;
+    t.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#1a1a18;color:#fff;padding:12px 18px;border-radius:14px;font-size:13px;font-family:Geist,system-ui,sans-serif;z-index:99999;box-shadow:0 8px 30px rgba(0,0,0,0.3);max-width:80%;text-align:center;opacity:0;transition:opacity .2s;';
+    document.body.appendChild(t);
+    requestAnimationFrame(function () { t.style.opacity = '1'; });
+    setTimeout(function () { t.style.opacity = '0'; setTimeout(function () { t.remove(); }, 250); }, 2600);
+  }
 
   function maskStranger(p) {
     if (!p) return p;
@@ -16,6 +28,8 @@
     if (window.PopChatsDB.__safetyWrapped) return true;
     var D = window.PopChatsDB;
     D.__safetyWrapped = true;
+
+    // Stranger chat list: hide real name
     if (typeof D.listMyChats === 'function') {
       var _list = D.listMyChats.bind(D);
       D.listMyChats = async function () {
@@ -26,6 +40,8 @@
         return chats;
       };
     }
+
+    // Stranger conversation header: hide real name
     if (typeof D.getChatMembers === 'function') {
       var _members = D.getChatMembers.bind(D);
       D.getChatMembers = async function (chatId) {
@@ -43,6 +59,48 @@
         return members;
       };
     }
+
+    // Profile-picture moderation: scan each avatar after upload; reject on block
+    if (typeof D.uploadAvatar === 'function') {
+      var _upload = D.uploadAvatar.bind(D);
+      D.uploadAvatar = async function (file) {
+        var url = await _upload(file);
+        try {
+          var marker = '/object/public/avatars/';
+          var path = (url && url.indexOf(marker) !== -1) ? url.split(marker)[1] : null;
+          if (path && window.sb) {
+            var sess = await window.sb.auth.getSession();
+            var token = sess && sess.data && sess.data.session && sess.data.session.access_token;
+            if (token) {
+              var res = await fetch(window.SUPABASE_URL + '/functions/v1/moderate-avatar', {
+                method: 'POST',
+                headers: {
+                  'Authorization': 'Bearer ' + token,
+                  'apikey': window.SUPABASE_PUBLISHABLE_KEY,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ path: path })
+              });
+              if (res.ok) {
+                var out = await res.json().catch(function () { return null; });
+                if (out && out.allowed === false) {
+                  throw new Error('MODERATION_BLOCKED');
+                }
+              }
+              // If the function is not deployed yet (e.g. 404) we do not block.
+            }
+          }
+        } catch (e) {
+          if (e && e.message === 'MODERATION_BLOCKED') {
+            toast('That photo was rejected. Please choose another one.');
+            throw new Error('This image was rejected by moderation. Please choose another photo.');
+          }
+          // Network/other errors: do not hard-block the avatar upload.
+        }
+        return url;
+      };
+    }
+
     return true;
   }
 
@@ -59,7 +117,7 @@
           if (otherId && window.PopChatsDB && window.PopChatsDB.friendshipState) {
             var state = await window.PopChatsDB.friendshipState(otherId);
             if (state !== 'friends') {
-              alert('You can only call your friends. Send a friend request first.');
+              toast('Only friends can call. Send a friend request first.');
               return false;
             }
           }
