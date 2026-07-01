@@ -8,3 +8,11 @@ window.POPCHATS_SITE_URL = 'https://popchats.zenvx.in/';
 // Edge Function secret (VAPID_PRIVATE_KEY); never put it here.
 // If empty, web push registration is silently skipped.
 window.VAPID_PUBLIC_KEY = 'BDRinntPwfQpiQ8yoceVftektR98Vadl-_OJyzLsIs8slNvGYtkoiiXf1i4sbTg7PsrfohEXlpwacfiGLM4ARBc';
+
+// Load PopChats safety & privacy enhancements (delete-account UI, friends-only
+// calls, stranger name masking). Kept separate so this config stays declarative.
+(function () {
+  var s = document.createElement('script');
+  s.src = 'popchats-safety.js?v=1';
+  document.head.appendChild(s);
+})();
