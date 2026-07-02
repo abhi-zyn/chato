@@ -7,7 +7,9 @@
 (function () {
   'use strict';
 
-  var STORAGE_BASE = 'https://api.popchats.zenvx.in'; // Cloudflare Worker (storage only)
+  // Cloudflare Worker that proxies ONLY /storage/v1/object/* to Supabase.
+  // Single-level subdomain so it's covered by the free *.zenvx.in Universal SSL.
+  var STORAGE_BASE = 'https://api-popchats.zenvx.in';
 
   function toast(text) {
     var t = document.createElement('div');
@@ -74,16 +76,13 @@
     if (typeof D.updateMyProfile === 'function') {
       var _update = D.updateMyProfile.bind(D);
       D.updateMyProfile = async function (patch) {
-        // Completing onboarding without a DOB is not allowed.
         if (patch && patch.onboarded === true && !patch.dob) {
           throw new Error('Please enter your date of birth.');
         }
         if (patch && patch.dob) {
-          // Client-side check for instant feedback.
           if (!isAdultDob(patch.dob)) {
             throw new Error('You must be 18 or older to use PopChats.');
           }
-          // Server-side enforcement: sets is_adult + consent, rejects minors.
           try {
             var r = await window.sb.rpc('set_date_of_birth', { _dob: patch.dob, _gender: patch.gender || null });
             if (r && r.error && (r.error.message || '').toLowerCase().indexOf('must_be_18') !== -1) {
@@ -91,8 +90,6 @@
             }
           } catch (e) {
             if (e && e.message && e.message.indexOf('18 or older') !== -1) throw e;
-            // Otherwise ignore (e.g. migration 017 not run yet / transient) —
-            // the client check above already blocked under-18.
           }
         }
         return _update(patch);
