@@ -1,11 +1,16 @@
 // PopChats — safety & privacy enhancements (loaded via supabase-config.js)
 // 1) Stranger chats show username only (real/full name hidden)
-// 2) Calls gated to friends (server also enforces via migration 019). The call
-//    icon stays visible; a non-friend tap shows a friendly toast instead.
-// 3) Profile-picture uploads are scanned by the moderate-avatar Edge Function
-// 4) Delete-account UI wired to the delete-account Edge Function
+// 2) Calls gated to friends (server also enforces via migration 019). Call icon
+//    stays visible; a non-friend tap shows a friendly toast.
+// 3) Avatar uploads AND their public URLs are routed through the Cloudflare
+//    storage proxy (api.popchats.zenvx.in) so WAF rate-limiting + the CSAM
+//    Scanning Tool apply. Auth/DB/Realtime keep talking to Supabase directly.
+// 4) Delete-account UI wired to the delete-account Edge Function.
 (function () {
   'use strict';
+
+  // Cloudflare Worker that proxies ONLY /storage/v1/object/* to Supabase.
+  var STORAGE_BASE = 'https://api.popchats.zenvx.in';
 
   // ---------- tiny toast ----------
   function toast(text) {
@@ -60,44 +65,38 @@
       };
     }
 
-    // Profile-picture moderation: scan each avatar after upload; reject on block
+    // Route avatar uploads + public URLs through the Cloudflare storage proxy.
     if (typeof D.uploadAvatar === 'function') {
-      var _upload = D.uploadAvatar.bind(D);
       D.uploadAvatar = async function (file) {
-        var url = await _upload(file);
-        try {
-          var marker = '/object/public/avatars/';
-          var path = (url && url.indexOf(marker) !== -1) ? url.split(marker)[1] : null;
-          if (path && window.sb) {
-            var sess = await window.sb.auth.getSession();
-            var token = sess && sess.data && sess.data.session && sess.data.session.access_token;
-            if (token) {
-              var res = await fetch(window.SUPABASE_URL + '/functions/v1/moderate-avatar', {
-                method: 'POST',
-                headers: {
-                  'Authorization': 'Bearer ' + token,
-                  'apikey': window.SUPABASE_PUBLISHABLE_KEY,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ path: path })
-              });
-              if (res.ok) {
-                var out = await res.json().catch(function () { return null; });
-                if (out && out.allowed === false) {
-                  throw new Error('MODERATION_BLOCKED');
-                }
-              }
-              // If the function is not deployed yet (e.g. 404) we do not block.
-            }
-          }
-        } catch (e) {
-          if (e && e.message === 'MODERATION_BLOCKED') {
-            toast('That photo was rejected. Please choose another one.');
-            throw new Error('This image was rejected by moderation. Please choose another photo.');
-          }
-          // Network/other errors: do not hard-block the avatar upload.
+        var sess = await window.sb.auth.getSession();
+        var session = sess && sess.data && sess.data.session;
+        var token = session && session.access_token;
+        var userId = session && session.user && session.user.id;
+        if (!token || !userId) throw new Error('Not signed in');
+
+        var name = (file && file.name) ? file.name : 'photo.jpg';
+        var ext = (name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+        var path = userId + '/avatar_' + Date.now() + '.' + ext;
+
+        // Upload THROUGH the proxy so WAF rate-limit + CSAM scanning apply.
+        var res = await fetch(STORAGE_BASE + '/storage/v1/object/avatars/' + path, {
+          method: 'POST',
+          headers: {
+            'apikey': window.SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': (file && file.type) || 'application/octet-stream',
+            'x-upsert': 'true'
+          },
+          body: file
+        });
+        if (!res.ok) {
+          var errText = await res.text().catch(function () { return ''; });
+          throw new Error('Avatar upload failed (' + res.status + ') ' + errText);
         }
-        return url;
+
+        // Return the PUBLIC url on the proxy so image *views* also flow through
+        // Cloudflare and get CSAM-scanned when served.
+        return STORAGE_BASE + '/storage/v1/object/public/avatars/' + path;
       };
     }
 
