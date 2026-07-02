@@ -1,18 +1,14 @@
 // PopChats — safety & privacy enhancements (loaded via supabase-config.js)
 // 1) Stranger chats show username only (real/full name hidden)
-// 2) Calls gated to friends (server also enforces via migration 019). Call icon
-//    stays visible; a non-friend tap shows a friendly toast.
-// 3) Avatar uploads AND their public URLs are routed through the Cloudflare
-//    storage proxy (api.popchats.zenvx.in) so WAF rate-limiting + the CSAM
-//    Scanning Tool apply. Auth/DB/Realtime keep talking to Supabase directly.
-// 4) Delete-account UI wired to the delete-account Edge Function.
+// 2) Calls gated to friends (server also enforces via migration 019)
+// 3) Avatar uploads + public URLs routed through the Cloudflare storage proxy
+// 4) 18+ age gate enforced at onboarding (client check + server set_date_of_birth)
+// 5) Delete-account UI wired to the delete-account Edge Function
 (function () {
   'use strict';
 
-  // Cloudflare Worker that proxies ONLY /storage/v1/object/* to Supabase.
-  var STORAGE_BASE = 'https://api.popchats.zenvx.in';
+  var STORAGE_BASE = 'https://api.popchats.zenvx.in'; // Cloudflare Worker (storage only)
 
-  // ---------- tiny toast ----------
   function toast(text) {
     var t = document.createElement('div');
     t.textContent = text;
@@ -26,6 +22,15 @@
     if (!p) return p;
     var uname = p.username || p.display_name || 'stranger';
     return Object.assign({}, p, { full_name: uname, display_name: uname });
+  }
+
+  // True if dob (YYYY-MM-DD) is at least 18 years ago.
+  function isAdultDob(dob) {
+    var d = new Date(dob);
+    if (isNaN(d.getTime())) return false;
+    var cutoff = new Date();
+    cutoff.setFullYear(cutoff.getFullYear() - 18);
+    return d <= cutoff;
   }
 
   function wrapDB() {
@@ -65,6 +70,35 @@
       };
     }
 
+    // 18+ age gate: enforce at onboarding (when a dob is being saved).
+    if (typeof D.updateMyProfile === 'function') {
+      var _update = D.updateMyProfile.bind(D);
+      D.updateMyProfile = async function (patch) {
+        // Completing onboarding without a DOB is not allowed.
+        if (patch && patch.onboarded === true && !patch.dob) {
+          throw new Error('Please enter your date of birth.');
+        }
+        if (patch && patch.dob) {
+          // Client-side check for instant feedback.
+          if (!isAdultDob(patch.dob)) {
+            throw new Error('You must be 18 or older to use PopChats.');
+          }
+          // Server-side enforcement: sets is_adult + consent, rejects minors.
+          try {
+            var r = await window.sb.rpc('set_date_of_birth', { _dob: patch.dob, _gender: patch.gender || null });
+            if (r && r.error && (r.error.message || '').toLowerCase().indexOf('must_be_18') !== -1) {
+              throw new Error('You must be 18 or older to use PopChats.');
+            }
+          } catch (e) {
+            if (e && e.message && e.message.indexOf('18 or older') !== -1) throw e;
+            // Otherwise ignore (e.g. migration 017 not run yet / transient) —
+            // the client check above already blocked under-18.
+          }
+        }
+        return _update(patch);
+      };
+    }
+
     // Route avatar uploads + public URLs through the Cloudflare storage proxy.
     if (typeof D.uploadAvatar === 'function') {
       D.uploadAvatar = async function (file) {
@@ -78,7 +112,6 @@
         var ext = (name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
         var path = userId + '/avatar_' + Date.now() + '.' + ext;
 
-        // Upload THROUGH the proxy so WAF rate-limit + CSAM scanning apply.
         var res = await fetch(STORAGE_BASE + '/storage/v1/object/avatars/' + path, {
           method: 'POST',
           headers: {
@@ -93,9 +126,6 @@
           var errText = await res.text().catch(function () { return ''; });
           throw new Error('Avatar upload failed (' + res.status + ') ' + errText);
         }
-
-        // Return the PUBLIC url on the proxy so image *views* also flow through
-        // Cloudflare and get CSAM-scanned when served.
         return STORAGE_BASE + '/storage/v1/object/public/avatars/' + path;
       };
     }

@@ -13,10 +13,10 @@ window.POPCHATS_SITE_URL = 'https://popchats.zenvx.in/';
 window.VAPID_PUBLIC_KEY = 'BDRinntPwfQpiQ8yoceVftektR98Vadl-_OJyzLsIs8slNvGYtkoiiXf1i4sbTg7PsrfohEXlpwacfiGLM4ARBc';
 
 // Load PopChats safety & privacy enhancements (delete-account UI, friends-only
-// calls, stranger name masking, proxied avatar storage). Kept separate so this
-// config stays declarative.
+// calls, stranger name masking, proxied avatar storage, 18+ age gate). Kept
+// separate so this config stays declarative.
 (function () {
   var s = document.createElement('script');
-  s.src = 'popchats-safety.js?v=3';
+  s.src = 'popchats-safety.js?v=4';
   document.head.appendChild(s);
 })();
